@@ -1,0 +1,36 @@
+name: Update Pages market data
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app code (default branch)
+        uses: actions/checkout@v4
+        with:
+          path: app
+
+      - name: Checkout gh-pages branch (site)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Export market data into site/data
+        run: node app/server/export.js --out site/data
+
+      - name: Commit and push data to gh-pages
+        run: |
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git commit -m "chore(pages): update market data $(date -u '+%Y-%m-%d %H:%M UTC')" || echo "no data changes"
+          git push

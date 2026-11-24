@@ -85,18 +85,39 @@ The scanner sorts ascending by `distance%`, so names closest to their stop are o
 Alert body: `{ "symbol": "AAPL", "type": "below|above|near_stop|stop_breach", "value": 150, "note": "…" }`
 (`value` omitted for `stop_breach`.)
 
+## 🌐 GitHub Pages (hosted, no server needed)
+
+The same dashboard runs as a **static site on GitHub Pages**:
+
+- A scheduled workflow (`.github/workflows/update-data.yml`, every 30 min + manual dispatch)
+  runs `server/export.js` on GitHub's runners, fetches **real market data**, and commits
+  JSON snapshots to the `gh-pages` branch (`data/scan.json`, `data/history/*.json`,
+  `data/sentiment.json`, …). The static frontend recomputes stop-loss levels, badges and
+  the scanner client-side from that data.
+- Alerts on the Pages build are stored in your browser (`localStorage`) and evaluated
+  client-side against the latest snapshot; browser notifications still work.
+- Enable it once: **Settings → Pages → Build and deployment → Source: "Deploy from a branch" → branch `gh-pages`, folder `/ (root)` → Save.**
+  The site is then served at `https://<you>.github.io/marketguard/`.
+- The workflow needs **Settings → Actions → General → Workflow permissions → "Read and write permissions"** so it can push data commits to `gh-pages`.
+- Scheduled runs execute on the repo's default branch. Trigger a manual refresh anytime from the **Actions** tab ("Update Pages market data" → "Run workflow").
+- To regenerate the data locally: `node server/export.js --out public/data` (add `DEMO=1` for synthetic data without network).
+
 ## Project layout
 
 ```
 server/
   index.js       zero-dependency HTTP server + routes (binds 127.0.0.1 by default)
-  data.js        market data layer: Yahoo Finance → Stooq fallback, caching, scan
-  indicators.js  pure math: MA, ATR, volatility, trailing stop, badges (unit-tested)
-  alerts.js      persistent alert store + evaluation state machine
+  data.js        market data layer: Yahoo Finance → Stooq fallback, caching, scan, sentiment
+  export.js      exports static JSON data (data/*.json) for the GitHub Pages build
+  indicators.js  re-exports the shared math module
+  alerts.js      persistent alert store + evaluation state machine (server mode)
   demo.js        seeded synthetic data for offline demo mode
   universe.js    default watchlist (US + Euronext Amsterdam)
-public/          dashboard SPA (vanilla JS + canvas charts, no build step)
-test/            node:test suites (indicators, alerts, API smoke via DEMO mode)
+public/          dashboard SPA (vanilla JS + canvas charts, no build step);
+                 runs against the local API (npm start) or as a static Pages site
+                 (public/indicators.js is the shared math module used by both)
+.github/workflows/update-data.yml  scheduled market-data refresh for gh-pages
+test/            node:test suites (indicators, alerts, export, API smoke via DEMO mode)
 data/            runtime persistence (gitignored)
 ```
 

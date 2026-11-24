@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { computeSnapshot } from './indicators.js';
-import { demoHistory, demoQuote } from './demo.js';
+import { computeSnapshot, RANGE_DAYS, sliceRange } from './indicators.js';
+import { demoHistory, demoQuote, demoSentiment, ratingOf } from './demo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -226,12 +226,35 @@ export async function scanUniverse(symbols, settings) {
   return rows;
 }
 
-export const RANGE_DAYS = { '1mo': 31, '3mo': 93, '6mo': 183, '1y': 366, '2y': 732, '5y': 1830 };
+export { RANGE_DAYS, sliceRange };
 
-export function sliceRange(rows, range) {
-  const days = RANGE_DAYS[range];
-  if (!days) return rows;
-  const cutoff = Date.now() - days * 86400000;
-  const sliced = rows.filter((r) => r.t >= cutoff);
-  return sliced.length >= 30 ? sliced : rows.slice(-Math.min(rows.length, 120));
+export async function fetchSentiment() {
+  if (DEMO) return demoSentiment();
+  let fg = null;
+  try {
+    const j = JSON.parse(await httpGet('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', 10000));
+    const f = j.fear_and_greed || {};
+    const hist = (j.fear_and_greed_historical?.data || [])
+      .slice(-60)
+      .map((p) => ({ t: p.x, score: p.y, rating: p.rating || ratingOf(p.y) }));
+    fg = {
+      score: f.score ?? null,
+      rating: f.rating || (f.score != null ? ratingOf(f.score) : null),
+      timestamp: f.timestamp || null,
+      previousClose: f.previous_close ?? null,
+      weekAgo: f.previous_1_week ?? null,
+      monthAgo: f.previous_1_month ?? null,
+      yearAgo: f.previous_1_year ?? null,
+      history: hist,
+    };
+  } catch {
+    fg = null;
+  }
+  let vix = null;
+  try {
+    vix = await fetchQuote('^VIX');
+  } catch {
+    vix = null;
+  }
+  return { fearGreed: fg, vix, demo: false };
 }

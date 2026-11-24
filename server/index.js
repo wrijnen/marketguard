@@ -7,14 +7,13 @@ import {
   DEMO,
   fetchHistory,
   fetchQuote,
+  fetchSentiment,
   getSnapshot,
-  httpGet,
   scanUniverse,
   sliceRange,
 } from './data.js';
 import { AlertStore } from './alerts.js';
 import { DEFAULT_UNIVERSE } from './universe.js';
-import { demoSentiment, ratingOf } from './demo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -118,37 +117,6 @@ async function runEvaluate() {
   return fired.map((f) => ({ alert: f.alert, entry: f.entry }));
 }
 
-async function getSentiment() {
-  if (DEMO) return demoSentiment();
-  let fg = null;
-  try {
-    const j = JSON.parse(await httpGet('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', 10000));
-    const f = j.fear_and_greed || {};
-    const hist = (j.fear_and_greed_historical?.data || [])
-      .slice(-60)
-      .map((p) => ({ t: p.x, score: p.y, rating: p.rating || ratingOf(p.y) }));
-    fg = {
-      score: f.score ?? null,
-      rating: f.rating || (f.score != null ? ratingOf(f.score) : null),
-      timestamp: f.timestamp || null,
-      previousClose: f.previous_close ?? null,
-      weekAgo: f.previous_1_week ?? null,
-      monthAgo: f.previous_1_month ?? null,
-      yearAgo: f.previous_1_year ?? null,
-      history: hist,
-    };
-  } catch {
-    fg = null;
-  }
-  let vix = null;
-  try {
-    vix = await fetchQuote('^VIX');
-  } catch {
-    vix = null;
-  }
-  return { fearGreed: fg, vix, demo: false };
-}
-
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://localhost');
@@ -195,7 +163,7 @@ const server = http.createServer(async (req, res) => {
         const h = await fetchHistory(sym, '2y');
         return send(res, 200, { symbol: sym, meta: h.meta, range, rows: sliceRange(h.rows, range) });
       }
-      if (p === '/api/sentiment' && req.method === 'GET') return send(res, 200, await getSentiment());
+      if (p === '/api/sentiment' && req.method === 'GET') return send(res, 200, await fetchSentiment());
       if (p === '/api/alerts' && req.method === 'GET') {
         return send(res, 200, { alerts: alerts.state.alerts, log: alerts.state.log });
       }
