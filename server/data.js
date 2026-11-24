@@ -23,16 +23,60 @@ function cacheSet(key, value) {
   memCache.set(key, { ts: Date.now(), value });
 }
 
-export async function httpGet(url, timeoutMs = 12000) {
+export async function httpGet(url, timeoutMs = 12000, headers = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: UA, signal: ctrl.signal });
+    const res = await fetch(url, { headers: { ...UA, ...headers }, signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
   } finally {
     clearTimeout(timer);
   }
+}
+
+const NASDAQ_HEADERS = { Accept: 'application/json', Origin: 'https://www.nasdaq.com', Referer: 'https://www.nasdaq.com/' };
+
+const ADR_MAP = { SHELL: 'SHEL', HEIA: 'HEINY', INGA: 'ING', AD: 'ADYEY' };
+
+export function nasdaqSymbol(symbol) {
+  const s = String(symbol).toUpperCase();
+  if (!s.includes('.')) return s;
+  const base = s.split('.')[0];
+  return ADR_MAP[base] || base;
+}
+
+function nasdaqNum(v) {
+  return parseFloat(String(v ?? '').replace(/[$,\s]/g, ''));
+}
+
+function nasdaqDate(d) {
+  const [m, day, y] = String(d).split('/');
+  return Date.UTC(Number(y), Number(m) - 1, Number(day), 16);
+}
+
+async function fetchHistoryNasdaq(symbol) {
+  const sym = nasdaqSymbol(symbol);
+  const to = new Date();
+  const from = new Date(to.getTime() - 2 * 366 * 86400000);
+  const fmt = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  const url = `https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/historical?assetclass=stocks&fromdate=${fmt(from)}&todate=${fmt(to)}&limit=10000`;
+  const j = JSON.parse(await httpGet(url, 15000, NASDAQ_HEADERS));
+  const raw = j?.data?.tradesTable?.rows;
+  if (!Array.isArray(raw) || !raw.length) throw new Error('nasdaq: empty');
+  const rows = raw
+    .map((r) => ({ t: nasdaqDate(r.date), o: nasdaqNum(r.open), h: nasdaqNum(r.high), l: nasdaqNum(r.low), c: nasdaqNum(r.close), v: nasdaqNum(r.volume) }))
+    .filter((r) => Number.isFinite(r.c) && r.c > 0)
+    .sort((a, b) => a.t - b.t);
+  if (!rows.length) throw new Error('nasdaq: no valid rows');
+  let name = sym;
+  try {
+    const info = JSON.parse(await httpGet(`https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/info?assetclass=stocks`, 8000, NASDAQ_HEADERS));
+    name = info?.data?.companyName || sym;
+  } catch {
+    /* best effort */
+  }
+  return { rows, meta: { name, currency: 'USD', exchange: 'Nasdaq', nasdaqSymbol: sym, forSymbol: symbol !== sym ? symbol : undefined } };
 }
 
 const YAHOO_TO_STOOQ = {
@@ -133,11 +177,15 @@ export async function fetchHistory(symbol, range = '2y') {
     out = await fetchHistoryYahoo(symbol, range === '5y' ? '5y' : '2y');
   } catch {
     try {
-      out = await fetchHistoryStooq(symbol);
-    } catch (e2) {
-      const err = new Error(`history unavailable for ${symbol} (${e2.message})`);
-      err.code = 'UPSTREAM';
-      throw err;
+      out = await fetchHistoryNasdaq(symbol);
+    } catch {
+      try {
+        out = await fetchHistoryStooq(symbol);
+      } catch (e2) {
+        const err = new Error(`history unavailable for ${symbol} (${e2.message})`);
+        err.code = 'UPSTREAM';
+        throw err;
+      }
     }
   }
   cacheSet(key, out);
