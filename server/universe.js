@@ -1,0 +1,17 @@
+export const DEFAULT_UNIVERSE = [
+  'AAPL',
+  'MSFT',
+  'NVDA',
+  'AMZN',
+  'GOOGL',
+  'META',
+  'TSLA',
+  'JPM',
+  'ASML.AS',
+  'AD.AS',
+  'INGA.AS',
+  'NN.AS',
+  'SHELL.AS',
+  'HEIA.AS',
+  'VWCE.AS',
+];
