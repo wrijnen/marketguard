@@ -1,11 +1,21 @@
-import { BADGES, computeSnapshot, dataFileName, sliceRange } from './indicators.js';
+import { BADGES, computeEvents, computeSnapshot, dataFileName, sliceRange, stopRuleText } from './indicators.js';
 
 const STATUS_META = {
   safe: { label: 'Safe', cls: 'status-safe' },
   watch: { label: 'Watch', cls: 'status-watch' },
   near: { label: 'Near stop', cls: 'status-near' },
   breached: { label: 'Breached', cls: 'status-breached' },
+  check: { label: 'Check data', cls: 'status-check' },
   unknown: { label: 'n/a', cls: 'status-unknown' },
+};
+
+const STATUS_ORDER = ['check', 'breached', 'near', 'watch', 'safe'];
+const GROUP_LABELS = {
+  check: 'Check data (stop >40% from price — possible unadjusted split)',
+  breached: 'Breached (at or below stop)',
+  near: 'Near stop',
+  watch: 'Watch (≤10% above stop)',
+  safe: 'Safe (>10% above stop)',
 };
 
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£', GBp: 'p', CHF: 'CHF ', CAD: 'C$', SEK: 'kr', DKK: 'kr' };
@@ -26,17 +36,23 @@ const STALE_MS = 15 * 60 * 1000;
 const LS_SETTINGS = 'sla_settings_overrides';
 const LS_ALERTS = 'sla_alerts';
 const LS_LOG = 'sla_alerts_log';
+const LS_THEME = 'sla_theme';
 
 const state = {
   mode: 'server',
   settings: null,
   scan: [],
+  scanAll: [],
+  entries: [],
   scanGeneratedAt: null,
   scanSource: null,
   alerts: [],
   log: [],
   sentiment: null,
   filters: new Set(),
+  dashFilter: 'all',
+  catFilter: 'all',
+  regionFilter: 'all',
   detail: null,
   detailRange: '1y',
   notified: new Set(),
@@ -44,8 +60,12 @@ const state = {
   histCache: new Map(),
   indexCache: null,
   scanJsonCache: null,
+  scanAllCache: null,
   baseSettingsCache: null,
   lastGen: null,
+  snapSig: null,
+  eventsCache: new Map(),
+  historyLoaded: false,
   digest: { daily: [], weekly: [], lastDaily: 0, lastWeekly: 0 },
 };
 
@@ -93,6 +113,34 @@ async function scanJsonCache() {
   return state.scanJsonCache;
 }
 
+async function scanAllJsonCache() {
+  if (!state.scanAllCache) {
+    try {
+      state.scanAllCache = await fetchJson('data/scan-all.json');
+    } catch {
+      state.scanAllCache = await scanJsonCache();
+    }
+  }
+  return state.scanAllCache;
+}
+
+function snapSigOf(baseSettings, overrides, universe) {
+  return JSON.stringify({
+    stopPct: baseSettings.stopPct,
+    lookback: baseSettings.lookback,
+    atrMult: baseSettings.atrMult,
+    threshold: baseSettings.threshold,
+    stops: overrides.stops || {},
+    universe,
+  });
+}
+
+function effectiveStopPct(sym) {
+  const s = state.settings || {};
+  const over = s.stops?.[String(sym).toUpperCase()];
+  return Number.isFinite(Number(over)) ? Number(over) : s.stopPct ?? 15;
+}
+
 async function baseSettings() {
   if (!state.baseSettingsCache) state.baseSettingsCache = await fetchJson('data/settings.json');
   return state.baseSettingsCache;
@@ -109,60 +157,66 @@ async function historyOf(sym) {
   return state.histCache.get(sym);
 }
 
-async function staticScan() {
+async function staticScan(scope = 'all') {
   const idx = await indexCache();
-  let scanJson = null;
-  try {
-    scanJson = await scanJsonCache();
-  } catch {
-    scanJson = null;
-  }
-  const qBySym = new Map((scanJson?.rows || []).filter((r) => r.quote).map((r) => [r.symbol, r.quote]));
+  const all = await scanAllJsonCache();
   const settings = mergedSettings();
-  const rows = [];
-  await Promise.all(
-    idx.symbols.map(async (sym) => {
-      try {
-        const hj = await historyOf(sym);
-        const snap = computeSnapshot(hj.rows, { ...settings, symbol: sym });
-        if (!snap) throw new Error('empty history');
-        const closes = hj.rows.map((r) => r.c);
-        const last = closes[closes.length - 1];
-        const prev = closes[closes.length - 2];
-        const fallbackQuote = {
-          symbol: sym,
-          price: last,
-          prevClose: prev ?? last,
-          changePct: prev ? ((last - prev) / prev) * 100 : 0,
-          time: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
-          asOf: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
-          currency: hj.meta?.currency,
-          name: hj.meta?.name,
-          source: `${hj.meta?.source || 'history'}-close`,
-        };
-        rows.push({
-          symbol: sym,
-          meta: hj.meta,
-          quote: qBySym.get(sym) || fallbackQuote,
-          snapshot: { ...snap, spark: closes.slice(-60) },
-        });
-      } catch (e) {
-        rows.push({ symbol: sym, error: 'no data' });
-      }
-    })
-  );
-  rows.sort((a, b) => {
+  const overrides = loadLS(LS_SETTINGS, {});
+  const universe = settings.universe || idx.symbols || [];
+  const rows = (all.rows || []).map((r) => ({ ...r }));
+  const sig = snapSigOf(all.settings || settings, overrides, universe);
+  if (state.snapSig !== sig) {
+    state.snapSig = sig;
+    state.histCache.clear();
+    state.eventsCache.clear();
+    await Promise.all(
+      rows.map(async (r) => {
+        try {
+          const hj = await historyOf(r.symbol);
+          const snap = computeSnapshot(hj.rows, { ...settings, stopPct: effectiveStopPct(r.symbol), symbol: r.symbol });
+          if (snap) {
+            snap.spark = hj.rows.slice(-60).map((x) => x.c);
+            r.snapshot = snap;
+            r.meta = r.meta || hj.meta;
+            delete r.error;
+          }
+          if (!r.quote) {
+            const closes = hj.rows.map((x) => x.c);
+            const last = closes[closes.length - 1];
+            const prev = closes[closes.length - 2];
+            r.quote = {
+              symbol: r.symbol,
+              price: last,
+              prevClose: prev ?? last,
+              changePct: prev ? ((last - prev) / prev) * 100 : 0,
+              time: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
+              asOf: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
+              currency: hj.meta?.currency,
+              name: hj.meta?.name,
+              source: `${hj.meta?.source || 'history'}-close`,
+              realTime: false,
+            };
+          }
+        } catch {
+          if (!r.snapshot && !r.error) r.error = 'no data';
+        }
+      })
+    );
+  }
+  const byDist = (a, b) => {
     const da = a.snapshot?.dist;
     const db = b.snapshot?.dist;
     if (da == null && db == null) return 0;
     if (da == null) return 1;
     if (db == null) return -1;
     return da - db;
-  });
-  return { settings, generatedAt: idx.generatedAt, rows };
+  };
+  rows.sort(byDist);
+  const tracked = rows.filter((r) => universe.includes(r.symbol));
+  return { settings, generatedAt: idx.generatedAt, scope, entries: all.entries || null, rows: scope === 'tracked' ? tracked : rows, tracked };
 }
 
-function staticAlertAdd(body) {
+function staticValidate(body) {
   const sym = String(body.symbol || '').trim().toUpperCase();
   if (!sym) throw new Error('symbol is required');
   if (!ALERT_TYPES.includes(body.type)) throw new Error('invalid type');
@@ -171,13 +225,18 @@ function staticAlertAdd(body) {
     val = Number(body.value);
     if (!Number.isFinite(val)) throw new Error('value must be a number');
   }
+  return { sym, type: body.type, val, sched: ALERT_SCHEDULES.includes(body.schedule) ? body.schedule : 'realtime' };
+}
+
+function staticAlertAdd(body) {
+  const { sym, type, val, sched } = staticValidate(body);
   const alert = {
     id: crypto.randomUUID(),
     symbol: sym,
     type: body.type,
     value: val,
     note: String(body.note || ''),
-    schedule: ALERT_SCHEDULES.includes(body.schedule) ? body.schedule : 'realtime',
+    schedule: sched,
     active: true,
     state: 'clear',
     acknowledged: false,
@@ -252,7 +311,11 @@ async function staticApi(path, opts = {}) {
     saveLS(LS_SETTINGS, { ...loadLS(LS_SETTINGS, {}), ...body });
     return mergedSettings();
   }
-  if (path === 'api/scan' && method === 'GET') return staticScan();
+  const scanMatch = path.match(/^api\/scan(?:\?(.*))?$/);
+  if (scanMatch && method === 'GET') {
+    const scope = new URLSearchParams(scanMatch[1] || '').get('scope') === 'tracked' ? 'tracked' : 'all';
+    return staticScan(scope);
+  }
   const h = path.match(/^api\/history\/([^?]+)/);
   if (h && method === 'GET') {
     const sym = decodeURIComponent(h[1]);
@@ -270,6 +333,25 @@ async function staticApi(path, opts = {}) {
   if (path === 'api/alerts' && method === 'GET') return { alerts: loadLS(LS_ALERTS, []), log: loadLS(LS_LOG, []) };
   if (path === 'api/alerts' && method === 'POST') return staticAlertAdd(body);
   if (path === 'api/evaluate' && method === 'POST') return { fired: await staticEvaluate() };
+  const patch = path.match(/^api\/alerts\/([^/]+)$/);
+  if (patch && method === 'PATCH') {
+    const list = loadLS(LS_ALERTS, []);
+    const a = list.find((x) => x.id === patch[1]);
+    if (!a) throw new Error('alert not found');
+    const { sym, type, val, sched } = staticValidate({ symbol: body.symbol ?? a.symbol, type: body.type ?? a.type, value: body.value !== undefined ? body.value : a.value, schedule: body.schedule ?? a.schedule });
+    a.symbol = sym;
+    a.type = type;
+    a.value = val;
+    a.schedule = sched;
+    if (body.note !== undefined) a.note = String(body.note || '');
+    if (body.active !== undefined) a.active = !!body.active;
+    if (type !== a.type) {
+      a.state = 'clear';
+      a.triggeredAt = null;
+    }
+    saveLS(LS_ALERTS, list);
+    return { alert: a };
+  }
   const ack = path.match(/^api\/alerts\/([^/]+)\/ack$/);
   if (ack && method === 'POST') {
     const list = loadLS(LS_ALERTS, []);
@@ -310,6 +392,28 @@ function fmtPct(n, digits = 1) {
 function fmtTime(ts) {
   if (!ts) return '';
   return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function freshnessLabel(q) {
+  if (!q) return '';
+  const live = q.realTime ? 'Live' : 'Delayed 15m';
+  return `${live}${q.source ? ` · ${q.source}` : ''}`;
+}
+
+function curChip(cur) {
+  return cur ? `<span class="cur">${esc(cur)}</span>` : '';
+}
+
+function currencyOf(r) {
+  return r.quote?.currency || r.meta?.currency || 'USD';
+}
+
+function priceOf(r) {
+  return r.quote?.price ?? r.snapshot?.close;
+}
+
+function changeOf(r) {
+  return r.quote?.changePct ?? r.snapshot?.changePct;
 }
 
 function toast(message) {
@@ -496,85 +600,102 @@ function distCellHtml(dist) {
     <span class="num" style="color:${statusColor(dist)}">${fmtPct(dist)}</span></div>`;
 }
 
-function rowActionsHtml(r) {
+function rowActionsHtml(r, tracked) {
+  const trackBtn = tracked
+    ? `<button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}" title="Remove from dashboard">remove</button>`
+    : `<button class="icon-btn" data-act="track" data-symbol="${esc(r.symbol)}" title="Add to dashboard">track</button>`;
   return `<div class="row-actions">
-    <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}">chart</button>
-    <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}">alert</button>
-    <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
+    <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}" title="Chart">chart</button>
+    <button class="icon-btn" data-act="editstop" data-symbol="${esc(r.symbol)}" title="Edit this symbol's stop %">stop%</button>
+    <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}" title="Set alert">alert</button>
+    ${trackBtn}
   </div>`;
 }
 
-function errorRowHtml(r, inCard) {
+function errorRowHtml(r, inCard, tracked = true) {
+  const msg = r.error ? `No data for this symbol right now (${r.error}). The source may not cover it.` : 'No data for this symbol right now. The quote source may not cover it.';
   const actions = inCard
     ? `<div class="card-actions">
         <button class="btn small" data-act="retry" data-symbol="${esc(r.symbol)}">Retry</button>
-        <button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>
+        ${tracked ? `<button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>` : `<button class="btn small primary" data-act="track" data-symbol="${esc(r.symbol)}">Track</button>`}
       </div>`
     : `<div class="row-actions">
         <button class="icon-btn" data-act="retry" data-symbol="${esc(r.symbol)}">retry</button>
-        <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
+        ${tracked ? `<button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>` : `<button class="icon-btn" data-act="track" data-symbol="${esc(r.symbol)}">track</button>`}
       </div>`;
   if (inCard) {
-    return `<div class="stock-card" data-symbol="${esc(r.symbol)}">
-      <div class="card-top"><span class="card-symbol">${esc(r.symbol)}</span></div>
-      <div class="empty" style="text-align:left;padding:6px 0">No data for this symbol right now. The quote source may not cover it.</div>
+    return `<div class="stock-card" data-symbol="${esc(r.symbol)}" tabindex="0">
+      <div class="card-top"><span class="card-symbol">${esc(r.symbol)}</span><span class="card-name">${esc(r.note || '')}</span></div>
+      <div class="empty" style="text-align:left;padding:6px 0">${esc(msg)}</div>
       ${actions}
     </div>`;
   }
-  return `<tr data-symbol="${esc(r.symbol)}"><td class="sym">${esc(r.symbol)}</td><td colspan="8" class="muted">No data for this symbol right now.</td><td>${actions}</td></tr>`;
+  return `<tr data-symbol="${esc(r.symbol)}" tabindex="0"><td class="sym">${esc(r.symbol)}</td><td colspan="9" class="muted">${esc(msg)}</td><td>${actions}</td></tr>`;
 }
 
-function cardHtml(r) {
+function cardHtml(r, opts = {}) {
   const s = r.snapshot;
-  if (!s) return errorRowHtml(r, true);
+  const tracked = opts.tracked ?? (state.settings?.universe || []).includes(r.symbol);
+  if (!s) return errorRowHtml(r, true, tracked);
   const q = r.quote || {};
-  const price = q.price ?? s.close;
-  const chg = q.changePct ?? s.changePct;
-  const cur = q.currency || r.meta?.currency;
+  const price = priceOf(r);
+  const chg = changeOf(r);
+  const cur = currencyOf(r);
   const st = STATUS_META[s.status] || STATUS_META.unknown;
   const asof = q.asOf || q.time;
-  return `<div class="stock-card status-${s.status}" data-symbol="${esc(r.symbol)}">
+  const customStop = state.settings?.stops?.[r.symbol];
+  const stopLabel = customStop != null ? `Stop-loss (${customStop}% custom)` : `Stop-loss (${s.stopPctUsed ?? state.settings?.stopPct ?? 15}%)`;
+  return `<div class="stock-card status-${s.status}" data-symbol="${esc(r.symbol)}" tabindex="0">
     <div class="card-top">
-      <div><span class="card-symbol">${esc(r.symbol)}</span> <span class="card-name">${esc(r.meta?.name || '')}</span></div>
+      <div><span class="card-symbol">${esc(r.symbol)}</span> <span class="card-name">${esc(r.meta?.name || r.note || '')}</span></div>
       <span class="status-chip ${st.cls}">${st.label}</span>
     </div>
     <div class="card-top">
-      <div><span class="card-price">${fmtPrice(price, cur)}</span><div class="card-asof">${asof ? `as of ${fmtTime(asof)}${q.source ? ` · ${esc(q.source)}` : ''}` : ''}</div></div>
+      <div><span class="card-price">${fmtPrice(price, cur)}</span>${curChip(cur)}<div class="card-asof">${asof ? `${freshnessLabel(q)} · ${fmtTime(asof)}` : freshnessLabel(q)}</div></div>
       <span class="chg ${chg >= 0 ? 'up' : 'down'}">${fmtPct(chg)}</span>
     </div>
     <canvas class="spark" data-spark="${esc(r.symbol)}"></canvas>
-    <div class="stop-row"><span>Stop-loss <b>${fmtPrice(s.stop, cur)}</b></span><span>High <b>${fmtPrice(s.high, cur)}</b></span></div>
+    <div class="stop-row"><span>${stopLabel} <b>${fmtPrice(s.stop, cur)}</b>${curChip(cur)}</span>
+      <span>High <b>${fmtPrice(s.high, cur)}</b></span>
+      <button class="icon-btn" data-act="editstop" data-symbol="${esc(r.symbol)}" title="Edit this symbol's stop %">✎</button>
+    </div>
     <div class="stop-row"><span>Distance to stop</span>${distCellHtml(s.dist)}</div>
+    ${s.status === 'check' ? `<div class="check-note">Stop is more than 40% from price — usually an unadjusted stock split. Prices are split-adjusted automatically; verify the history source.</div>` : ''}
+    ${s.splitsAdjusted ? `<div class="check-note dim">${s.splitsAdjusted} split(s) auto-adjusted in history</div>` : ''}
     <div class="badges">${badgeHtml(s.badges)}</div>
     <div class="card-actions">
       <button class="btn small" data-act="chart" data-symbol="${esc(r.symbol)}">Chart</button>
       <button class="btn small" data-act="alert" data-symbol="${esc(r.symbol)}">Alert</button>
-      <button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>
+      ${tracked
+        ? `<button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>`
+        : `<button class="btn small primary" data-act="track" data-symbol="${esc(r.symbol)}">Track</button>`}
     </div>
   </div>`;
 }
 
 function tableRowHtml(r, point) {
   const s = r.snapshot;
-  if (!s) return errorRowHtml(r, false);
+  const tracked = (state.settings?.universe || []).includes(r.symbol);
+  if (!s) return errorRowHtml(r, false, tracked);
   const q = r.quote || {};
-  const price = q.price ?? s.close;
-  const chg = q.changePct ?? s.changePct;
-  const cur = q.currency || r.meta?.currency;
+  const price = priceOf(r);
+  const chg = changeOf(r);
+  const cur = currencyOf(r);
   const st = STATUS_META[s.status] || STATUS_META.unknown;
-  const rowCls = [point ? 'row-point' : '', s.status === 'breached' ? 'row-breached' : s.status === 'near' ? 'row-near' : ''].filter(Boolean).join(' ');
+  const rowCls = [point ? 'row-point' : '', s.status === 'breached' ? 'row-breached' : s.status === 'near' ? 'row-near' : s.status === 'check' ? 'row-check' : ''].filter(Boolean).join(' ');
   const asof = q.asOf || q.time;
-  return `<tr class="${rowCls}" data-symbol="${esc(r.symbol)}">
-    <td class="sym">${esc(r.symbol)}</td>
-    <td class="name">${esc(r.meta?.name || '')}</td>
-    <td class="num">${fmtPrice(price, cur)}<div style="font-size:10px;color:var(--muted);font-weight:400">${asof ? fmtTime(asof) : ''}</div></td>
+  const customStop = state.settings?.stops?.[r.symbol];
+  return `<tr class="${rowCls}" data-symbol="${esc(r.symbol)}" tabindex="0">
+    <td class="sym">${esc(r.symbol)}${r.category ? `<div class="cat">${esc(r.category)}${r.region ? ` · ${esc(r.region)}` : ''}</div>` : ''}</td>
+    <td class="name">${esc(r.meta?.name || r.note || '')}</td>
+    <td class="num">${fmtPrice(price, cur)}${curChip(cur)}<div class="sub">${asof ? `${freshnessLabel(q)} · ${fmtTime(asof)}` : freshnessLabel(q)}</div></td>
     <td class="num" style="color:${chg >= 0 ? 'var(--safe)' : 'var(--breach)'}">${fmtPct(chg)}</td>
     <td><canvas class="spark-sm" data-spark="${esc(r.symbol)}"></canvas></td>
-    <td class="num">${fmtPrice(s.stop, cur)}</td>
+    <td class="num">${fmtPrice(s.stop, cur)}${customStop != null ? `<div class="sub">${customStop}% custom</div>` : ''}<div class="sub">${curChip(cur)}</div></td>
     <td>${distCellHtml(s.dist)}</td>
     <td><span class="status-chip ${st.cls}">${st.label}</span></td>
     <td><div class="badges">${badgeHtml(s.badges)}</div></td>
-    <td>${rowActionsHtml(r)}</td>
+    <td>${rowActionsHtml(r, tracked)}</td>
   </tr>`;
 }
 
@@ -585,51 +706,178 @@ function paintSparklines(containerSel) {
   });
 }
 
+function statusCounts(rows) {
+  const c = { check: 0, breached: 0, near: 0, watch: 0, safe: 0, nodata: 0 };
+  for (const r of rows) {
+    if (!r.snapshot) c.nodata++;
+    else if (c[r.snapshot.status] != null) c[r.snapshot.status]++;
+    else c.nodata++;
+  }
+  return c;
+}
+
 function renderStats() {
-  const rows = state.scan.filter((r) => r.snapshot);
-  const near = rows.filter((r) => r.snapshot.status === 'near').length;
-  const breached = rows.filter((r) => r.snapshot.status === 'breached').length;
-  const safe = rows.filter((r) => r.snapshot.badges.includes('safeBuffer')).length;
-  const recovered = rows.filter((r) => r.snapshot.badges.includes('recovered')).length;
+  const rows = state.scan;
+  const c = statusCounts(rows);
   const t = state.settings?.threshold ?? 5;
+  const recovered = rows.filter((r) => r.snapshot?.badges.includes('recovered')).length;
   $('#stats-row').innerHTML = `
-    <div class="stat-card"><div class="label">Near stop, within ${t}%</div><div class="value" style="color:var(--near)">${near}</div></div>
-    <div class="stat-card"><div class="label">Stop breached</div><div class="value" style="color:var(--breach)">${breached}</div></div>
-    <div class="stat-card"><div class="label">Safe buffer, over 10%</div><div class="value" style="color:var(--safe)">${safe}</div></div>
-    <div class="stat-card"><div class="label">Recovered</div><div class="value" style="color:var(--accent-hi)">${recovered}</div></div>
-    <div class="stat-card"><div class="label">Tracked symbols</div><div class="value">${rows.length}</div></div>`;
+    <div class="stat-card"><div class="label">Tracked symbols</div><div class="value">${rows.filter((r) => r.snapshot).length}</div></div>
+    <div class="stat-card"><div class="label">Breached</div><div class="value" style="color:var(--breach)">${c.breached}</div></div>
+    <div class="stat-card"><div class="label">Near stop, within ${t}%</div><div class="value" style="color:var(--near)">${c.near}</div></div>
+    <div class="stat-card"><div class="label">Watch, ≤10%</div><div class="value" style="color:var(--muted)">${c.watch}</div></div>
+    <div class="stat-card"><div class="label">Safe, over 10%</div><div class="value" style="color:var(--safe)">${c.safe}</div></div>
+    <div class="stat-card"><div class="label">Check data</div><div class="value" style="color:var(--check)">${c.check}</div></div>
+    <div class="stat-card"><div class="label">Recovered</div><div class="value" style="color:var(--accent-hi)">${recovered}</div></div>`;
+}
+
+function renderDashFilters() {
+  const c = statusCounts(state.scan);
+  const opts = [
+    ['all', `All (${state.scan.length})`],
+    ['breached', `Breached (${c.breached})`],
+    ['near', `Near (${c.near})`],
+    ['watch', `Watch (${c.watch})`],
+    ['safe', `Safe (${c.safe})`],
+    ['check', `Check data (${c.check})`],
+  ];
+  $('#dash-filters').innerHTML = opts
+    .map(([k, label]) => `<button class="filter-chip ${state.dashFilter === k ? 'on' : ''}" data-dfilter="${k}">${esc(label)}</button>`)
+    .join('');
+}
+
+function renderScanFilters() {
+  const cats = [...new Set(state.scanAll.map((r) => r.category || 'stock'))].sort();
+  const regions = [...new Set(state.scanAll.map((r) => r.region || 'US'))].sort();
+  const catChips = ['all', ...cats].map((k) => `<button class="filter-chip ${state.catFilter === k ? 'on' : ''}" data-cat="${esc(k)}">${k === 'all' ? 'All categories' : esc(k)}</button>`).join('');
+  const regChips = ['all', ...regions].map((k) => `<button class="filter-chip ${state.regionFilter === k ? 'on' : ''}" data-region="${esc(k)}">${k === 'all' ? 'All regions' : esc(k)}</button>`).join('');
+  $('#scan-cat-filters').innerHTML = catChips;
+  $('#scan-region-filters').innerHTML = regChips;
 }
 
 function renderDashboard() {
   const grid = $('#cards-grid');
-  const rows = [...state.scan].sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
-  if (!rows.length) {
+  const rows = state.scan.filter((r) => state.dashFilter === 'all' || r.snapshot?.status === state.dashFilter);
+  renderDashFilters();
+  if (!state.scan.length) {
     grid.innerHTML = '<div class="empty">Loading the dashboard…</div>';
     return;
   }
-  grid.innerHTML = rows.map((r) => cardHtml(r)).join('');
+  if (!rows.length) {
+    grid.innerHTML = '<div class="empty">No positions in this group.</div>';
+    return;
+  }
+  grid.innerHTML = rows.map((r) => cardHtml(r, { tracked: true })).join('');
   paintSparklines('#cards-grid');
 }
 
 function renderScanner() {
   const t = state.settings?.threshold ?? 5;
   const tbody = $('#scan-tbody');
-  const rows = state.scan.filter((r) => {
-    if (!r.snapshot) return true;
-    if (state.filters.size && ![...state.filters].every((f) => r.snapshot.badges.includes(f))) return false;
+  const all = state.scanAll.length ? state.scanAll : state.scan;
+  const rows = all.filter((r) => {
+    if (state.catFilter !== 'all' && (r.category || 'stock') !== state.catFilter) return false;
+    if (state.regionFilter !== 'all' && (r.region || 'US') !== state.regionFilter) return false;
+    if (state.filters.size) {
+      if (!r.snapshot) return false;
+      if (![...state.filters].every((f) => r.snapshot.badges.includes(f))) return false;
+    }
     return true;
   });
-  const withData = state.scan.filter((r) => r.snapshot);
-  const within = withData.filter((r) => r.snapshot.dist != null && r.snapshot.dist <= t).length;
+  const c = statusCounts(all);
   const gen = state.scanGeneratedAt ? `, snapshot ${fmtTime(state.scanGeneratedAt)}` : '';
-  $('#scan-summary').textContent = `${within} of ${withData.length} positions within ${t}% of their stop, sorted closest first${gen}.`;
+  $('#scan-summary').textContent =
+    `${all.length} scanned — ${c.check} check data, ${c.breached} breached, ${c.near} near stop (≤${t}%), ${c.watch} watch, ${c.safe} safe, ${c.nodata} no data` +
+    (rows.length !== all.length ? ` · showing ${rows.length}` : '') +
+    ` — sorted closest to stop first${gen}. Same status rules as the Dashboard.`;
+  renderScanFilters();
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="empty">No matching positions.</div></td></tr>';
+    $('#scan-cards').innerHTML = '<div class="empty">No matching positions.</div>';
     return;
   }
-  const firstWithData = rows.findIndex((r) => r.snapshot);
-  tbody.innerHTML = rows.map((r, i) => tableRowHtml(r, i === firstWithData)).join('');
+  const groups = [];
+  for (const st of STATUS_ORDER) {
+    const g = rows.filter((r) => r.snapshot?.status === st);
+    if (g.length) groups.push({ label: `${GROUP_LABELS[st]} — ${g.length}`, rows: g });
+  }
+  const errRows = rows.filter((r) => !r.snapshot);
+  if (errRows.length) groups.push({ label: `No data — ${errRows.length}`, rows: errRows });
+  const firstIdx = rows.findIndex((r) => r.snapshot);
+  const rowOf = new Map();
+  rows.forEach((r, i) => rowOf.set(r, i));
+  tbody.innerHTML = groups
+    .map((g) => `<tr class="group-row"><td colspan="10">${esc(g.label)}</td></tr>` + g.rows.map((r) => tableRowHtml(r, rowOf.get(r) === firstIdx)).join(''))
+    .join('');
+  $('#scan-cards').innerHTML = rows.map((r) => cardHtml(r)).join('');
   paintSparklines('#scan-tbody');
+  paintSparklines('#scan-cards');
+}
+
+function renderStopRule() {
+  const { rule, tooltip } = stopRuleText(state.settings || {});
+  for (const id of ['#stop-rule-dash', '#stop-rule-scan']) {
+    const el = $(id);
+    if (el) {
+      el.textContent = rule;
+      el.title = tooltip;
+    }
+  }
+}
+
+async function renderHistory() {
+  const tbody = $('#hist-tbody');
+  const summary = $('#hist-summary');
+  const tracked = state.scan.filter((r) => r.snapshot);
+  if (!tracked.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty">No tracked symbols yet.</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = '<tr><td colspan="6"><div class="empty">Loading history…</div></td></tr>';
+  const settings = state.settings || {};
+  const events = [];
+  await Promise.all(
+    tracked.map(async (r) => {
+      try {
+        const cached = state.eventsCache.get(r.symbol);
+        let h;
+        if (cached && cached.sig === state.snapSig) h = cached.h;
+        else {
+          h = await api(`api/history/${encodeURIComponent(r.symbol)}?range=2y`);
+          state.eventsCache.set(r.symbol, { sig: state.snapSig, h });
+        }
+        const evs = computeEvents(h.rows, { lookback: settings.lookback ?? 252, stopPct: effectiveStopPct(r.symbol), source: h.meta?.source });
+        for (const e of evs) events.push({ ...e, symbol: r.symbol, currency: currencyOf(r) });
+      } catch {
+        /* skip symbols without history */
+      }
+    })
+  );
+  events.sort((a, b) => b.t - a.t);
+  const recent = events.slice(0, 300);
+  summary.textContent = `${events.length} events in the past year across ${tracked.length} tracked symbols — breaches (close ≤ stop), recoveries (close back above stop) and resets (stop stepped down when the old high aged out of the ${settings.lookback ?? 252}-session window). Source = history provider per symbol.`;
+  if (!recent.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty">No breaches, recoveries or resets in the past year.</div></td></tr>';
+    return;
+  }
+  const EVENT_LABEL = { breach: 'Breach', recovery: 'Recovery', reset: 'Reset' };
+  const EVENT_TIP = {
+    breach: 'Close was at or below the trailing stop on this date',
+    recovery: 'Close moved back above the stop after a breach',
+    reset: 'Stop stepped down: the old lookback high fell out of the window',
+  };
+  tbody.innerHTML = recent
+    .map(
+      (e) => `<tr>
+    <td class="num">${esc(fmtTime(e.date))}</td>
+    <td class="sym">${esc(e.symbol)}</td>
+    <td><span class="event-chip event-${e.type}" title="${esc(EVENT_TIP[e.type] || '')}">${esc(EVENT_LABEL[e.type] || e.type)}</span></td>
+    <td class="num">${fmtPrice(e.price, e.currency)}${curChip(e.currency)}</td>
+    <td class="num">${fmtPrice(e.stop, e.currency)}</td>
+    <td class="muted">${esc(e.source || '')}</td>
+  </tr>`
+    )
+    .join('');
 }
 
 function renderStamp() {
@@ -678,6 +926,7 @@ function renderAlerts() {
           ${a.note ? `<div class="note">${esc(a.note)}</div>` : ''}
           <div class="actions">
             ${a.state === 'triggered' && !a.acknowledged ? `<button class="btn small" data-ack="${esc(a.id)}">Acknowledge</button>` : ''}
+            <button class="btn small" data-edit="${esc(a.id)}">Edit</button>
             <button class="btn small danger" data-del="${esc(a.id)}">Delete</button>
           </div>
         </div>`;
@@ -798,20 +1047,20 @@ function closeModal() {
   state.detail = null;
 }
 
-function openAlertModal(symbol = '') {
+function openAlertModal(symbol = '', alert = null) {
   const overlay = $('#modal-overlay');
   const modal = $('#modal');
   overlay.classList.remove('hidden');
-  const options = (state.settings?.universe || state.scan.map((r) => r.symbol))
-    .map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
-    .join('');
+  const allSyms = [...new Set([...(state.settings?.universe || []), ...state.scanAll.map((r) => r.symbol)])];
+  const options = allSyms.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  const editing = !!alert;
   modal.innerHTML = `
     <button class="btn small ghost modal-close" id="modal-close">Close</button>
-    <h3>New alert</h3>
-    <div class="sub">${state.mode === 'static' ? 'Stored in this browser and checked locally every 30 s while the page is open.' : 'Checked server-side every 60 s; this page shows a toast and sends a browser notification while it is open.'}</div>
+    <h3>${editing ? 'Edit alert' : 'New alert'}</h3>
+    <div class="sub">${state.mode === 'static' ? 'Stored in this browser and checked locally every 30 s while the page is open.' : 'Checked server-side every 60 s; this page shows a toast and sends a browser notification while it is open.'} Rules and the triggered log persist across reloads.</div>
     <div class="form-grid">
       <label>Symbol
-        <input id="f-symbol" list="universe-list" value="${esc(symbol)}" placeholder="AAPL" />
+        <input id="f-symbol" list="universe-list" value="${esc(editing ? alert.symbol : symbol)}" placeholder="AAPL" />
         <datalist id="universe-list">${options}</datalist>
       </label>
       <label>Alert type
@@ -833,12 +1082,20 @@ function openAlertModal(symbol = '') {
       <label class="full" id="f-value-wrap">Value <input id="f-value" type="number" step="any" placeholder="e.g. 150 or 5" /></label>
       <label class="full">Note, optional <input id="f-note" placeholder="e.g. re-evaluate position" /></label>
     </div>
+    <div class="form-error hidden" id="f-error"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="f-cancel">Cancel</button>
-      <button class="btn primary" id="f-save">Create alert</button>
+      <button class="btn primary" id="f-save">${editing ? 'Save changes' : 'Create alert'}</button>
     </div>`;
   const typeSel = $('#f-type');
   const valueWrap = $('#f-value-wrap');
+  const errBox = $('#f-error');
+  if (editing) {
+    typeSel.value = alert.type;
+    $('#f-schedule').value = alert.schedule || 'realtime';
+    if (alert.value != null) $('#f-value').value = alert.value;
+    $('#f-note').value = alert.note || '';
+  }
   const syncValue = () => {
     valueWrap.style.display = typeSel.value === 'stop_breach' || typeSel.value === 'recovery' ? 'none' : '';
   };
@@ -852,14 +1109,74 @@ function openAlertModal(symbol = '') {
     const value = $('#f-value').value;
     const note = $('#f-note').value;
     const schedule = $('#f-schedule').value;
+    errBox.classList.add('hidden');
+    if (!symbol2) {
+      errBox.textContent = 'Symbol is required.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    if (type !== 'stop_breach' && type !== 'recovery' && (!value || !Number.isFinite(Number(value)))) {
+      errBox.textContent = 'Value must be a number for this alert type (e.g. 150, or 5 for a % distance).';
+      errBox.classList.remove('hidden');
+      return;
+    }
     try {
-      await api('api/alerts', { method: 'POST', body: JSON.stringify({ symbol: symbol2, type, value, note, schedule }) });
-      toast(`Alert created for ${symbol2}`);
+      const body = JSON.stringify({ symbol: symbol2, type, value, note, schedule });
+      if (editing) {
+        await api(`api/alerts/${alert.id}`, { method: 'PATCH', body });
+        toast(`Alert updated for ${symbol2}`);
+      } else {
+        await api('api/alerts', { method: 'POST', body });
+        toast(`Alert created for ${symbol2}`);
+      }
       closeModal();
       await loadAlerts();
     } catch (e) {
-      toast(`Could not create alert: ${e.message}`);
+      errBox.textContent = `Could not save alert: ${e.message}`;
+      errBox.classList.remove('hidden');
     }
+  };
+}
+
+function openStopModal(symbol) {
+  const overlay = $('#modal-overlay');
+  const modal = $('#modal');
+  overlay.classList.remove('hidden');
+  const global = state.settings?.stopPct ?? 15;
+  const current = state.settings?.stops?.[symbol];
+  modal.innerHTML = `
+    <button class="btn small ghost modal-close" id="modal-close">Close</button>
+    <h3>Stop % for ${esc(symbol)}</h3>
+    <div class="sub">Global stop is ${global}%. Set a per-symbol override here; leave empty to use the global value. Persisted with your settings (server: data/settings.json, static site: this browser).</div>
+    <div class="form-grid">
+      <label class="full">Stop % for ${esc(symbol)} <input id="s-value" type="number" min="1" max="50" step="0.5" value="${current ?? ''}" placeholder="global: ${global}" /></label>
+    </div>
+    <div class="form-error hidden" id="f-error"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="f-cancel">Cancel</button>
+      <button class="btn primary" id="f-save">Save stop</button>
+    </div>`;
+  $('#modal-close').onclick = closeModal;
+  $('#f-cancel').onclick = closeModal;
+  $('#f-save').onclick = async () => {
+    const errBox = $('#f-error');
+    errBox.classList.add('hidden');
+    const raw = $('#s-value').value.trim();
+    const stops = { ...(state.settings?.stops || {}) };
+    if (raw === '') delete stops[symbol];
+    else {
+      const v = Number(raw);
+      if (!Number.isFinite(v) || v < 1 || v > 50) {
+        errBox.textContent = 'Enter a number between 1 and 50, or leave empty to use the global stop.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+      stops[symbol] = v;
+    }
+    await api('api/settings', { method: 'PUT', body: JSON.stringify({ stops }) });
+    toast(raw === '' ? `${symbol} uses the global ${global}% stop` : `${symbol} stop set to ${raw}%`);
+    closeModal();
+    await loadScan();
   };
 }
 
@@ -932,7 +1249,10 @@ async function loadScan() {
         state.lastGen = idx.generatedAt;
         state.indexCache = idx;
         state.scanJsonCache = null;
+        state.scanAllCache = null;
         state.histCache.clear();
+        state.eventsCache.clear();
+        state.snapSig = null;
       }
     } catch {
       /* keep cache */
@@ -940,9 +1260,12 @@ async function loadScan() {
   }
   const data = await api('api/scan');
   state.settings = data.settings;
-  state.scan = data.rows;
+  state.entries = data.entries || state.entries;
+  state.scanAll = data.rows || [];
+  const universe = data.settings?.universe || [];
+  state.scan = data.tracked || state.scanAll.filter((r) => universe.includes(r.symbol));
   state.scanGeneratedAt = data.generatedAt || null;
-  const srcs = data.rows.map((r) => r.quote?.source).filter(Boolean);
+  const srcs = state.scanAll.map((r) => r.quote?.source).filter(Boolean);
   state.scanSource = srcs.length ? srcs.sort((a, b) => srcs.filter((v) => v === a).length - srcs.filter((v) => v === b).length)[0] : null;
   const health = await api('api/health').catch(() => ({}));
   state.demo = !!health.demo;
@@ -950,8 +1273,10 @@ async function loadScan() {
   renderStats();
   renderDashboard();
   renderScanner();
+  renderStopRule();
   renderSettingsInputs();
   renderStamp();
+  if ($('#view-history').classList.contains('active')) renderHistory();
 }
 
 async function loadAlerts() {
@@ -970,12 +1295,87 @@ async function loadSentiment() {
   }
 }
 
+function activateTab(view) {
+  $$('#tabs .tab').forEach((x) => {
+    const on = x.dataset.view === view;
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
+  requestAnimationFrame(() => {
+    paintSparklines('#cards-grid');
+    paintSparklines('#scan-tbody');
+    paintSparklines('#scan-cards');
+  });
+  if (view === 'history') renderHistory();
+}
+
+function initTheme() {
+  const saved = loadLS(LS_THEME, null);
+  const theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.dataset.theme = theme;
+  const btn = $('#theme-toggle');
+  if (btn) {
+    btn.textContent = theme === 'light' ? 'Dark mode' : 'Light mode';
+    btn.title = 'Toggle light/dark theme';
+    btn.setAttribute('aria-label', 'Toggle light/dark theme');
+  }
+}
+
 function init() {
   $$('#tabs .tab').forEach((t) => {
-    t.onclick = () => {
-      $$('#tabs .tab').forEach((x) => x.classList.toggle('active', x === t));
-      $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${t.dataset.view}`));
-    };
+    t.onclick = () => activateTab(t.dataset.view);
+  });
+
+  $('#theme-toggle').onclick = () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    saveLS(LS_THEME, next);
+    const btn = $('#theme-toggle');
+    btn.textContent = next === 'light' ? 'Dark mode' : 'Light mode';
+  };
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeModal();
+      return;
+    }
+    if (e.target.closest('input, select, textarea, button')) return;
+    const tabBar = e.target.closest('#tabs');
+    if (tabBar && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      e.preventDefault();
+      const tabs = $$('#tabs .tab');
+      const i = tabs.findIndex((t) => t.classList.contains('active'));
+      const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      activateTab(tabs[next].dataset.view);
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-symbol], .stock-card[data-symbol]')) {
+      e.preventDefault();
+      openDetail(e.target.dataset.symbol);
+    }
+  });
+
+  $('#dash-filters').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-dfilter]');
+    if (!chip) return;
+    state.dashFilter = chip.dataset.dfilter;
+    renderDashboard();
+  });
+
+  $('#scan-cat-filters').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-cat]');
+    if (!chip) return;
+    state.catFilter = chip.dataset.cat;
+    renderScanner();
+  });
+
+  $('#scan-region-filters').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-region]');
+    if (!chip) return;
+    state.regionFilter = chip.dataset.region;
+    renderScanner();
   });
 
   $('#add-symbol-form').onsubmit = async (e) => {
@@ -1002,6 +1402,11 @@ function init() {
   };
 
   $('#refresh-scan').onclick = () => loadScan();
+
+  $('#refresh-history').onclick = () => {
+    state.eventsCache.clear();
+    renderHistory();
+  };
 
   $('#badge-filters').addEventListener('click', (e) => {
     const chip = e.target.closest('.filter-chip');
@@ -1042,6 +1447,13 @@ function init() {
       const { act: kind, symbol } = act.dataset;
       if (kind === 'chart') return openDetail(symbol);
       if (kind === 'alert') return openAlertModal(symbol);
+      if (kind === 'editstop') return openStopModal(symbol);
+      if (kind === 'track') {
+        const universe = [...(state.settings?.universe || []), symbol].filter((v, i, a) => a.indexOf(v) === i);
+        await api('api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
+        toast(`Now tracking ${symbol} on the Dashboard`);
+        return loadScan();
+      }
       if (kind === 'remove') {
         const universe = (state.settings?.universe || []).filter((s) => s !== symbol);
         await api('api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
@@ -1050,7 +1462,11 @@ function init() {
       }
       if (kind === 'retry') {
         state.histCache.delete(symbol);
-        if (state.mode === 'static') state.scanJsonCache = null;
+        if (state.mode === 'static') {
+          state.scanJsonCache = null;
+          state.scanAllCache = null;
+          state.snapSig = null;
+        }
         toast(`Retrying ${symbol}…`);
         return loadScan();
       }
@@ -1061,6 +1477,12 @@ function init() {
     if (ack) {
       await api(`api/alerts/${ack.dataset.ack}/ack`, { method: 'POST', body: '{}' });
       return loadAlerts();
+    }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) {
+      const a = state.alerts.find((x) => x.id === edit.dataset.edit);
+      if (a) return openAlertModal(a.symbol, a);
+      return;
     }
     const del = e.target.closest('[data-del]');
     if (del) {
@@ -1090,6 +1512,7 @@ async function main() {
       toast(`Static data not found, run: node server/export.js --out public/data`);
     }
   }
+  initTheme();
   init();
   renderBadgeFilters();
   renderPermStatus();
