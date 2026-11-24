@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StopLoss Alert — Live Stoploss Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛑</text></svg>" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🛑</span>
+      <div>
+        <h1>StopLoss Alert</h1>
+        <p class="tagline">Live Stoploss Tracker &middot; real stock data &middot; price alerts</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="dashboard">Dashboard</button>
+      <button class="tab" data-view="scanner">Scanner</button>
+      <button class="tab" data-view="alerts">Alerts <span class="count-pill hidden" id="alert-count">0</span></button>
+    </nav>
+    <div class="topbar-right">
+      <div class="fg-pill hidden" id="fg-pill" title="CNN Fear &amp; Greed Index"></div>
+      <span class="demo-badge hidden" id="demo-badge">DEMO</span>
+      <button class="btn ghost small" id="notify-btn" title="Enable browser notifications">🔔</button>
+      <span class="clock" id="clock"></span>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-dashboard" class="view active">
+      <div class="stats-row" id="stats-row"></div>
+      <div class="panel-head">
+        <h2>Watchlist</h2>
+        <form id="add-symbol-form" class="add-form">
+          <input id="add-symbol-input" placeholder="Add symbol, e.g. AAPL or ASML.AS" autocomplete="off" />
+          <button class="btn" type="submit">+ Add</button>
+        </form>
+      </div>
+      <div class="cards-grid" id="cards-grid"></div>
+    </section>
+
+    <section id="view-scanner" class="view">
+      <div class="panel-head scanner-head">
+        <div>
+          <h2>Stoploss Scanner</h2>
+          <p class="muted" id="scan-summary">—</p>
+        </div>
+        <div class="scanner-controls">
+          <label>Stop % <input id="set-stopPct" type="number" min="1" max="50" step="0.5" /></label>
+          <label>Lookback
+            <select id="set-lookback">
+              <option value="63">3M</option>
+              <option value="126">6M</option>
+              <option value="252" selected>1Y</option>
+            </select>
+          </label>
+          <label>ATR mult <input id="set-atrMult" type="number" min="0.5" max="6" step="0.5" /></label>
+          <label>Alert within % <input id="set-threshold" type="number" min="1" max="30" step="0.5" /></label>
+          <button class="btn" id="apply-settings">Apply &amp; rescan</button>
+          <button class="btn ghost" id="refresh-scan" title="Refresh data">⟳</button>
+        </div>
+      </div>
+      <div class="badge-filters" id="badge-filters"></div>
+      <div class="table-wrap">
+        <table class="scan-table" id="scan-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Price</th><th>Chg</th><th>Stop-loss</th><th>Dist to stop</th><th>Status</th><th>Badges</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="scan-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="view-alerts" class="view">
+      <div class="panel-head">
+        <div>
+          <h2>Price Alerts</h2>
+          <p class="muted">Alerts are evaluated server-side every 60s and on demand. Browser notifications are sent when triggered.</p>
+        </div>
+        <button class="btn primary" id="new-alert-btn">+ New alert</button>
+      </div>
+      <div class="alerts-grid">
+        <div class="panel">
+          <h3>Active alerts</h3>
+          <div id="alerts-list" class="alerts-list"></div>
+        </div>
+        <div class="panel">
+          <h3>Triggered log</h3>
+          <div id="alerts-log" class="alerts-log"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack"></div>
+
+  <footer class="footer">
+    <p><strong>Disclaimer:</strong> StopLoss Alert provides alerts for educational purposes only and does not constitute financial advice.
+    Data from Yahoo Finance / Stooq / CNN (unofficial, may be delayed). Inspired by the public feature set of stoplossalert.nl — not affiliated with or endorsed by it.</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
