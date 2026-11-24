@@ -29,6 +29,7 @@ const state = {
   histCache: new Map(),
   indexCache: null,
   baseSettingsCache: null,
+  lastGen: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -291,11 +292,11 @@ function notifyBrowser(title, body) {
 }
 
 function statusColor(dist) {
-  if (dist == null) return '#8b94a7';
-  if (dist <= 0) return 'var(--red)';
-  if (dist <= (state.settings?.threshold ?? 5)) return 'var(--orange)';
-  if (dist <= 10) return 'var(--yellow)';
-  return 'var(--green)';
+  if (dist == null) return 'var(--color-muted)';
+  if (dist <= 0) return 'var(--color-dusk)';
+  if (dist <= (state.settings?.threshold ?? 5)) return 'var(--color-accent-2)';
+  if (dist <= 10) return 'var(--color-muted)';
+  return 'var(--color-accent-hi)';
 }
 
 function setupCanvas(canvas) {
@@ -319,7 +320,7 @@ function drawSparkline(canvas, values) {
   const px = (i) => (i / (values.length - 1)) * (w - 6) + 3;
   const py = (v) => h - 4 - ((v - min) / span) * (h - 8);
   const up = values[values.length - 1] >= values[0];
-  const color = up ? '#22c55e' : '#ef4444';
+  const color = up ? 'var(--color-accent-hi)' : 'var(--color-accent-2)';
   ctx.beginPath();
   values.forEach((v, i) => (i ? ctx.lineTo(px(i), py(v)) : ctx.moveTo(px(i), py(v))));
   ctx.strokeStyle = color;
@@ -329,7 +330,7 @@ function drawSparkline(canvas, values) {
   ctx.lineTo(px(values.length - 1), h);
   ctx.lineTo(px(0), h);
   ctx.closePath();
-  ctx.fillStyle = up ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)';
+  ctx.fillStyle = up ? 'oklch(84% 0.085 274 / 0.12)' : 'oklch(83% 0.095 62 / 0.12)';
   ctx.fill();
 }
 
@@ -351,9 +352,9 @@ function drawDetailChart(canvas, rows, snapshot) {
   const px = (i) => padL + (i / (rows.length - 1)) * iw;
   const py = (v) => padT + ih - ((v - min) / span) * ih;
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.fillStyle = '#8b94a7';
-  ctx.font = '10px system-ui';
+  ctx.strokeStyle = 'oklch(100% 0 0 / 0.06)';
+  ctx.fillStyle = 'var(--color-muted)';
+  ctx.font = '10px "Wix Madefor Text", system-ui, sans-serif';
   ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
     const v = min + (span * g) / 4;
@@ -385,25 +386,25 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.setLineDash([]);
   };
 
-  line(ma200, 'rgba(234,179,8,0.75)', 1.2);
-  line(ma50, 'rgba(34,211,238,0.75)', 1.2);
+  line(ma200, 'oklch(100% 0 0 / 0.4)', 1.2);
+  line(ma50, 'var(--color-accent-2)', 1.2);
 
   if (snapshot?.stop != null) {
     ctx.beginPath();
     ctx.moveTo(padL, py(snapshot.stop));
     ctx.lineTo(w - padR, py(snapshot.stop));
-    ctx.strokeStyle = 'rgba(239,68,68,0.9)';
+    ctx.strokeStyle = 'var(--color-accent-2)';
     ctx.lineWidth = 1.6;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(239,68,68,0.9)';
+    ctx.fillStyle = 'var(--color-accent-2)';
     ctx.fillText(`stop ${fmtPrice(snapshot.stop)}`, padL + 6, py(snapshot.stop) - 5);
   }
 
   const grad = ctx.createLinearGradient(0, padT, 0, padT + ih);
-  grad.addColorStop(0, 'rgba(99,102,241,0.35)');
-  grad.addColorStop(1, 'rgba(99,102,241,0)');
+  grad.addColorStop(0, 'oklch(77% 0.10 274 / 0.30)');
+  grad.addColorStop(1, 'oklch(77% 0.10 274 / 0)');
   ctx.beginPath();
   ctx.moveTo(px(0), py(closes[0]));
   closes.forEach((v, i) => ctx.lineTo(px(i), py(v)));
@@ -413,11 +414,11 @@ function drawDetailChart(canvas, rows, snapshot) {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  line(closes, '#818cf8', 2);
+  line(closes, 'var(--color-accent-hi)', 2);
 
   ctx.beginPath();
   ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#a5b4fc';
+  ctx.fillStyle = 'var(--color-accent-hi)';
   ctx.fill();
 }
 
@@ -445,12 +446,13 @@ function renderStats() {
   const safe = rows.filter((r) => r.snapshot.badges.includes('safeBuffer')).length;
   const recovered = rows.filter((r) => r.snapshot.badges.includes('recovered')).length;
   const t = state.settings?.threshold ?? 5;
-  $('#stats-row').innerHTML = `
-    <div class="stat-card"><div class="label">Near stop (≤${t}%)</div><div class="value" style="color:var(--orange)">${near}</div></div>
-    <div class="stat-card"><div class="label">Stop breached</div><div class="value" style="color:var(--red)">${breached}</div></div>
-    <div class="stat-card"><div class="label">Safe buffer (>10%)</div><div class="value" style="color:var(--green)">${safe}</div></div>
-    <div class="stat-card"><div class="label">Recovered</div><div class="value" style="color:var(--accent-2)">${recovered}</div></div>
-    <div class="stat-card"><div class="label">Tracked symbols</div><div class="value">${rows.length}</div></div>`;
+  $('#stats-row').innerHTML = `<div class="tally">
+    <div class="tally-item"><span class="k">Near stop (≤${t}%)</span><span class="v num" style="color:var(--color-accent-2)">${near}</span></div>
+    <div class="tally-item"><span class="k">Stop breached</span><span class="v num" style="color:var(--color-dusk)">${breached}</span></div>
+    <div class="tally-item"><span class="k">Safe buffer (&gt;10%)</span><span class="v num" style="color:var(--color-accent-hi)">${safe}</span></div>
+    <div class="tally-item"><span class="k">Recovered</span><span class="v num" style="color:var(--color-accent-2)">${recovered}</span></div>
+    <div class="tally-item"><span class="k">Tracked symbols</span><span class="v num">${rows.length}</span></div>
+  </div>`;
 }
 
 function renderCards() {
@@ -588,7 +590,7 @@ function renderSentiment() {
   }
   pill.classList.remove('hidden');
   const score = Math.round(fg.score);
-  const color = score <= 25 ? '#ef4444' : score <= 45 ? '#f97316' : score <= 55 ? '#eab308' : score <= 75 ? '#22c55e' : '#16a34a';
+  const color = score <= 25 ? 'var(--color-dusk)' : score <= 45 ? 'var(--color-accent-2)' : score <= 55 ? 'var(--color-muted)' : score <= 75 ? 'var(--color-accent)' : 'var(--color-accent-hi)';
   const vix = state.sentiment?.vix;
   pill.innerHTML = `<span class="fg-dot" style="background:${color}"></span> Fear &amp; Greed <b>${score}</b> · ${esc(fg.rating || '')}${vix?.price ? ` · VIX ${vix.price.toFixed(1)}` : ''}`;
   pill.title = `CNN Fear & Greed: ${score} (${fg.rating})\n1w ago: ${fg.weekAgo?.toFixed?.(0) ?? '—'} · 1m ago: ${fg.monthAgo?.toFixed?.(0) ?? '—'} · 1y ago: ${fg.yearAgo?.toFixed?.(0) ?? '—'}`;
@@ -728,6 +730,18 @@ async function loadSettings() {
 }
 
 async function loadScan() {
+  if (state.mode === 'static') {
+    try {
+      const idx = await fetchJson('data/index.json');
+      if (idx.generatedAt !== state.lastGen) {
+        state.lastGen = idx.generatedAt;
+        state.indexCache = idx;
+        state.histCache.clear();
+      }
+    } catch {
+      /* keep cache */
+    }
+  }
   const data = await api('api/scan');
   state.settings = data.settings;
   state.scan = data.rows;
