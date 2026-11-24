@@ -1,0 +1,23 @@
+{
+  "stopPct": 15,
+  "lookback": 252,
+  "atrMult": 2,
+  "threshold": 5,
+  "universe": [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "GOOGL",
+    "META",
+    "TSLA",
+    "JPM",
+    "ASML.AS",
+    "AD.AS",
+    "INGA.AS",
+    "NN.AS",
+    "SHELL.AS",
+    "HEIA.AS",
+    "VWCE.AS"
+  ]
+}
