@@ -101,15 +101,15 @@ export function statusFor(dist, threshold = 5) {
 }
 
 export const BADGES = [
-  { key: 'trend20', label: '🚀 3M Uptrend >20%' },
-  { key: 'trend10', label: '📈 3M Uptrend >10%' },
-  { key: 'nearTop', label: '🎯 Within 10% of Top' },
-  { key: 'aboveMA50', label: '📊 >MA50' },
-  { key: 'aboveMA200', label: '📉 >MA200' },
-  { key: 'goldenCross', label: '✨ Golden Cross' },
-  { key: 'lowVol', label: '🍃 Low Vol <30%' },
-  { key: 'safeBuffer', label: '🛡️ Safe Buffer >10%' },
-  { key: 'recovered', label: '💪 Recovered' },
+  { key: 'trend20', label: '3M uptrend over 20%' },
+  { key: 'trend10', label: '3M uptrend over 10%' },
+  { key: 'nearTop', label: 'within 10% of top' },
+  { key: 'aboveMA50', label: 'above MA50' },
+  { key: 'aboveMA200', label: 'above MA200' },
+  { key: 'goldenCross', label: 'golden cross' },
+  { key: 'lowVol', label: 'volatility under 30%' },
+  { key: 'safeBuffer', label: 'buffer over 10%' },
+  { key: 'recovered', label: 'recovered' },
 ];
 
 export function computeSnapshot(hist, opts = {}) {

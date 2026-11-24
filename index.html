@@ -3,54 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StopLoss Alert — Live Stoploss Tracker</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛑</text></svg>" />
-  <meta name="color-scheme" content="dark" />
+  <title>Stoploss Alert: live stop-loss register</title>
+  <meta name="description" content="A register of stock positions against their trailing stop-loss, sorted closest first, with real market data and price alerts." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23b81e5a' d='M10 2h12l8 8v12l-8 8H10l-8-8V10z'/%3E%3Cpath fill='%23f6f7f9' d='M9 12h14v8H9z'/%3E%3C/svg%3E" />
+  <meta name="color-scheme" content="light" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Wix+Madefor+Display:wght@400;500;600&family=Wix+Madefor+Text:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="topbar">
+  <header class="masthead">
     <div class="brand">
-      <span class="logo">🛑</span>
+      <svg class="logo" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path fill="var(--color-accent)" d="M10 2h12l8 8v12l-8 8H10l-8-8V10z"/><path fill="var(--color-sheet)" d="M9 12h14v8H9z"/></svg>
       <div>
-        <h1>StopLoss Alert</h1>
-        <p class="tagline">Live Stoploss Tracker &middot; real stock data &middot; price alerts</p>
+        <h1>Stoploss Alert</h1>
+        <p class="tagline">A register of positions against their trailing stop, closest first.</p>
       </div>
     </div>
     <nav class="tabs" id="tabs">
-      <button class="tab active" data-view="dashboard">Dashboard</button>
+      <button class="tab active" data-view="dashboard">Positions</button>
       <button class="tab" data-view="scanner">Scanner</button>
       <button class="tab" data-view="alerts">Alerts <span class="count-pill hidden" id="alert-count">0</span></button>
     </nav>
-    <div class="topbar-right">
-      <div class="fg-pill hidden" id="fg-pill" title="CNN Fear &amp; Greed Index"></div>
-      <span class="demo-badge hidden" id="demo-badge">DEMO</span>
-      <button class="btn ghost small" id="notify-btn" title="Enable browser notifications">🔔</button>
+    <div class="masthead-right">
+      <div class="fg-pill hidden" id="fg-pill" title="CNN Fear and Greed Index"></div>
+      <span class="demo-badge hidden" id="demo-badge">demo data</span>
+      <button class="btn ghost small" id="notify-btn" title="Enable browser notifications">Notify</button>
       <span class="clock" id="clock"></span>
     </div>
   </header>
 
   <main>
     <section id="view-dashboard" class="view active">
-      <div class="stats-row" id="stats-row"></div>
+      <div id="stats-row"></div>
       <div class="panel-head">
-        <h2>Watchlist</h2>
+        <h2>Positions</h2>
         <form id="add-symbol-form" class="add-form">
-          <input id="add-symbol-input" placeholder="Add symbol, e.g. AAPL or ASML.AS" autocomplete="off" />
-          <button class="btn" type="submit">+ Add</button>
+          <input id="add-symbol-input" placeholder="Add a symbol, e.g. AAPL" autocomplete="off" />
+          <button class="btn primary" type="submit">Add</button>
         </form>
       </div>
-      <div class="cards-grid" id="cards-grid"></div>
+      <div class="sheet table-wrap">
+        <table class="scan-table">
+          <thead>
+            <tr><th>Symbol</th><th>Name</th><th class="num">Price</th><th class="num">Chg</th><th>Last 60 sessions</th><th class="num">Stop-loss</th><th>Dist to stop</th><th>Status</th><th>Notes</th><th></th></tr>
+          </thead>
+          <tbody id="dash-tbody"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="view-scanner" class="view">
       <div class="panel-head scanner-head">
         <div>
-          <h2>Stoploss Scanner</h2>
-          <p class="muted" id="scan-summary">—</p>
+          <h2>Scanner</h2>
+          <p class="muted" id="scan-summary">Loading…</p>
         </div>
         <div class="scanner-controls">
           <label>Stop % <input id="set-stopPct" type="number" min="1" max="50" step="0.5" /></label>
@@ -63,17 +71,15 @@
           </label>
           <label>ATR mult <input id="set-atrMult" type="number" min="0.5" max="6" step="0.5" /></label>
           <label>Alert within % <input id="set-threshold" type="number" min="1" max="30" step="0.5" /></label>
-          <button class="btn" id="apply-settings">Apply &amp; rescan</button>
-          <button class="btn ghost" id="refresh-scan" title="Refresh data">⟳</button>
+          <button class="btn primary" id="apply-settings">Apply and rescan</button>
+          <button class="btn ghost" id="refresh-scan" title="Refresh data">Refresh</button>
         </div>
       </div>
       <div class="badge-filters" id="badge-filters"></div>
-      <div class="table-wrap">
+      <div class="sheet table-wrap">
         <table class="scan-table" id="scan-table">
           <thead>
-            <tr>
-              <th>Symbol</th><th>Price</th><th>Chg</th><th>Stop-loss</th><th>Dist to stop</th><th>Status</th><th>Badges</th><th></th>
-            </tr>
+            <tr><th>Symbol</th><th>Name</th><th class="num">Price</th><th class="num">Chg</th><th>Last 60 sessions</th><th class="num">Stop-loss</th><th>Dist to stop</th><th>Status</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody id="scan-tbody"></tbody>
         </table>
@@ -83,17 +89,17 @@
     <section id="view-alerts" class="view">
       <div class="panel-head">
         <div>
-          <h2>Price Alerts</h2>
-          <p class="muted">Alerts are evaluated server-side every 60s and on demand. Browser notifications are sent when triggered.</p>
+          <h2>Alerts</h2>
+          <p class="muted">Checked every minute against the latest snapshot; browser notifications on trigger.</p>
         </div>
-        <button class="btn primary" id="new-alert-btn">+ New alert</button>
+        <button class="btn primary" id="new-alert-btn">New alert</button>
       </div>
       <div class="alerts-grid">
-        <div class="panel">
+        <div class="sheet panel">
           <h3>Active alerts</h3>
           <div id="alerts-list" class="alerts-list"></div>
         </div>
-        <div class="panel">
+        <div class="sheet panel">
           <h3>Triggered log</h3>
           <div id="alerts-log" class="alerts-log"></div>
         </div>
@@ -102,14 +108,17 @@
   </main>
 
   <div class="modal-overlay hidden" id="modal-overlay">
-    <div class="modal" id="modal"></div>
+    <div class="modal sheet" id="modal"></div>
   </div>
 
   <div class="toast-stack" id="toast-stack"></div>
 
+  <noscript><p class="noscript">This register needs JavaScript to read its data files.</p></noscript>
+
   <footer class="footer">
-    <p><strong>Disclaimer:</strong> StopLoss Alert provides alerts for educational purposes only and does not constitute financial advice.
-    Data from Yahoo Finance / Stooq / CNN (unofficial, may be delayed). Inspired by the public feature set of stoplossalert.nl — not affiliated with or endorsed by it.</p>
+    <p><strong>Disclaimer:</strong> Stoploss Alert provides alerts for educational purposes only and does not constitute financial advice.
+    Market data from Yahoo Finance, the Nasdaq API or Stooq (unofficial, may be delayed). Inspired by the public feature set of stoplossalert.nl, not affiliated with it.
+    Theme: Almanac from <a href="https://github.com/Nutlope/hallmark">Hallmark</a> (MIT).</p>
   </footer>
 
   <script type="module" src="app.js"></script>
