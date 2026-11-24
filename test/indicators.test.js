@@ -10,7 +10,10 @@ import {
   stopSeries,
   distanceToStopPct,
   statusFor,
+  adjustSplits,
+  computeEvents,
   computeSnapshot,
+  stopRuleText,
 } from '../server/indicators.js';
 
 test('sma computes simple moving average', () => {
@@ -72,6 +75,14 @@ test('distanceToStopPct and statusFor', () => {
   assert.equal(statusFor(null, 5), 'unknown');
 });
 
+test('statusFor flags stops more than 40% from price as check data', () => {
+  assert.equal(statusFor(-60, 5), 'check', 'NFLX-style gap is flagged');
+  assert.equal(statusFor(-40.5, 5), 'check');
+  assert.equal(statusFor(45, 5), 'check');
+  assert.equal(statusFor(-39.9, 5), 'breached');
+  assert.equal(statusFor(-11.1, 5), 'breached');
+});
+
 function makeHist(closes) {
   return closes.map((c, i) => ({ t: (i + 1) * 86400000, o: c, h: c * 1.01, l: c * 0.99, c, v: 1000 }));
 }
@@ -80,16 +91,77 @@ test('computeSnapshot flags a breached stop after a drop from the high', () => {
   const closes = [
     ...Array.from({ length: 100 }, (_, i) => 100 + i * 0.2),
     120, 121, 122, 123, 124, 125,
-    100, 90, 80, 70, 60,
+    100, 95,
   ];
   const snap = computeSnapshot(makeHist(closes), { stopPct: 15, lookback: 252, threshold: 5, symbol: 'TEST' });
-  assert.equal(snap.close, 60);
+  assert.equal(snap.close, 95);
   assert.equal(snap.high, 125);
   assert.equal(snap.stop, 125 * 0.85);
   assert.ok(snap.dist < 0);
   assert.equal(snap.status, 'breached');
   assert.ok(!snap.badges.includes('safeBuffer'));
   assert.ok(snap.badges.includes('recovered') === false);
+});
+
+test('computeSnapshot flags an extreme gap as check data instead of breached', () => {
+  const closes = [
+    ...Array.from({ length: 100 }, (_, i) => 100 + i * 0.2),
+    125,
+    60,
+  ];
+  const snap = computeSnapshot(makeHist(closes), { stopPct: 15, lookback: 252, threshold: 5, symbol: 'NFLX' });
+  assert.ok(snap.dist < -40, `dist ${snap.dist}`);
+  assert.equal(snap.status, 'check');
+});
+
+test('adjustSplits rescales pre-split prices into the new unit', () => {
+  const hist = makeHist([100, 100, 10, 10.5, 12]);
+  const { rows, splits } = adjustSplits(hist);
+  assert.equal(splits, 1);
+  assert.deepEqual(rows.map((r) => r.c), [10, 10, 10, 10.5, 12]);
+});
+
+test('adjustSplits ignores a plain crash that matches no split factor', () => {
+  const hist = makeHist([100, 125, 60]);
+  const { rows, splits } = adjustSplits(hist);
+  assert.equal(splits, 0);
+  assert.deepEqual(rows.map((r) => r.c), [100, 125, 60]);
+});
+
+test('computeSnapshot applies split adjustment so a split does not fake a breach', () => {
+  const hist = makeHist([100, 100, 10, 10, 12]);
+  const snap = computeSnapshot(hist, { stopPct: 15, lookback: 252, threshold: 5, symbol: 'SPLIT' });
+  assert.equal(snap.splitsAdjusted, 1);
+  assert.equal(snap.stop, 12 * 0.85);
+  assert.ok(Math.abs(snap.dist - ((12 - 12 * 0.85) / 12) * 100) < 1e-9);
+  assert.equal(snap.status, 'safe');
+});
+
+test('computeEvents detects breach, reset and recovery', () => {
+  const closes = [100, 120, 110, 105, 100, 95, 90, 85, 80, 75, 130, 135];
+  const events = computeEvents(makeHist(closes), { lookback: 5, stopPct: 10, source: 'test' });
+  const types = events.map((e) => e.type);
+  assert.ok(types.includes('breach'), types.join(','));
+  assert.ok(types.includes('reset'), types.join(','));
+  assert.ok(types.includes('recovery'), types.join(','));
+  const breach = events.find((e) => e.type === 'breach');
+  assert.equal(breach.price, 105);
+  assert.ok(Math.abs(breach.stop - 120 * 0.9) < 1e-9);
+  const recovery = events.find((e) => e.type === 'recovery');
+  assert.equal(recovery.price, 130);
+  for (const e of events) {
+    assert.ok(e.date && e.t && e.source === 'test');
+  }
+  // breach precedes recovery chronologically
+  assert.ok(events.findIndex((e) => e.type === 'breach') < events.findIndex((e) => e.type === 'recovery'));
+});
+
+test('stopRuleText states the rule in plain words', () => {
+  const { rule, tooltip } = stopRuleText({ stopPct: 15, lookback: 252, atrMult: 2 });
+  assert.match(rule, /Stop = 15% below the highest close of the past year/);
+  assert.match(tooltip, /ratchet/i);
+  assert.match(tooltip, /reset/i);
+  assert.match(tooltip, /40%/);
 });
 
 test('computeSnapshot flags safe buffer and trend badges on a steady uptrend', () => {

@@ -6,7 +6,7 @@
   <title>Stoploss Alert: live stop-loss tracker</title>
   <meta name="description" content="A modern dashboard that tracks stock positions against their trailing stop-loss, sorted closest first, with real market data and price alerts." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%236366f1' d='M10 2h12l8 8v12l-8 8H10l-8-8V10z'/%3E%3Cpath fill='%230b0f17' d='M9 12h14v8H9z'/%3E%3C/svg%3E" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -21,16 +21,18 @@
         <p class="tagline">Positions against their trailing stop, closest first.</p>
       </div>
     </div>
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-view="dashboard">Dashboard</button>
-      <button class="tab" data-view="scanner">Scanner</button>
-      <button class="tab" data-view="alerts">Alerts <span class="count-pill hidden" id="alert-count">0</span></button>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button class="tab active" data-view="dashboard" role="tab" aria-selected="true">Dashboard</button>
+      <button class="tab" data-view="scanner" role="tab" aria-selected="false">Scanner</button>
+      <button class="tab" data-view="history" role="tab" aria-selected="false">History</button>
+      <button class="tab" data-view="alerts" role="tab" aria-selected="false">Alerts <span class="count-pill hidden" id="alert-count">0</span></button>
     </nav>
     <div class="topbar-right">
       <span class="stamp" id="stamp" title="When the snapshot was generated and by which data pipeline">no data yet</span>
       <span class="stale-badge hidden" id="stale-badge"></span>
       <div class="fg-pill hidden" id="fg-pill" title="CNN Fear and Greed Index"></div>
       <span class="demo-badge hidden" id="demo-badge">demo</span>
+      <button class="btn ghost small" id="theme-toggle" title="Toggle light/dark theme">Light mode</button>
       <button class="btn ghost small" id="notify-btn" title="Browser notification permission">Notify</button>
       <span class="clock" id="clock"></span>
     </div>
@@ -46,6 +48,8 @@
           <button class="btn primary" type="submit">Add</button>
         </form>
       </div>
+      <p class="stop-rule" id="stop-rule-dash"></p>
+      <div class="badge-filters" id="dash-filters"></div>
       <div class="cards-grid" id="cards-grid"></div>
     </section>
 
@@ -70,13 +74,37 @@
           <button class="btn ghost" id="refresh-scan" title="Refresh data">Refresh</button>
         </div>
       </div>
-      <div class="badge-filters" id="badge-filters"></div>
+      <p class="stop-rule" id="stop-rule-scan"></p>
+      <div class="filter-bar">
+        <div class="badge-filters" id="scan-cat-filters"></div>
+        <div class="badge-filters" id="scan-region-filters"></div>
+        <div class="badge-filters" id="badge-filters"></div>
+      </div>
       <div class="table-wrap">
         <table class="scan-table" id="scan-table">
           <thead>
             <tr><th>Symbol</th><th class="col-name">Name</th><th class="num">Price</th><th class="num">Day</th><th>Last 60 sessions</th><th class="num">Stop-loss</th><th>Dist to stop</th><th>Status</th><th>Notes</th><th></th></tr>
           </thead>
           <tbody id="scan-tbody"></tbody>
+        </table>
+      </div>
+      <div class="cards-grid scan-cards" id="scan-cards"></div>
+    </section>
+
+    <section id="view-history" class="view">
+      <div class="panel-head">
+        <div>
+          <h2>Breach history</h2>
+          <p class="muted" id="hist-summary">Loading…</p>
+        </div>
+        <button class="btn ghost" id="refresh-history">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="scan-table" id="hist-table">
+          <thead>
+            <tr><th class="num">Date</th><th>Symbol</th><th>Event</th><th class="num">Price</th><th class="num">Stop at the time</th><th>History source</th></tr>
+          </thead>
+          <tbody id="hist-tbody"></tbody>
         </table>
       </div>
     </section>

@@ -46,7 +46,7 @@ export class AlertStore {
     fs.renameSync(tmp, this.file);
   }
 
-  add({ symbol, type, value, note, schedule }) {
+  static validate({ symbol, type, value, schedule }) {
     const sym = String(symbol || '').trim().toUpperCase();
     if (!sym) {
       const e = new Error('symbol is required');
@@ -68,12 +68,17 @@ export class AlertStore {
       }
     }
     const sched = ALERT_SCHEDULES.includes(schedule) ? schedule : 'realtime';
+    return { sym, type, val, sched };
+  }
+
+  add(body) {
+    const { sym, type, val, sched } = AlertStore.validate(body);
     const alert = {
       id: crypto.randomUUID(),
       symbol: sym,
       type,
       value: val,
-      note: String(note || ''),
+      note: String(body.note || ''),
       schedule: sched,
       active: true,
       state: 'clear',
@@ -84,6 +89,35 @@ export class AlertStore {
     this.state.alerts.unshift(alert);
     this.save();
     return alert;
+  }
+
+  update(id, patch) {
+    const a = this.state.alerts.find((x) => x.id === id);
+    if (!a) {
+      const e = new Error('alert not found');
+      e.statusCode = 404;
+      throw e;
+    }
+    const next = {
+      symbol: patch.symbol ?? a.symbol,
+      type: patch.type ?? a.type,
+      value: patch.value !== undefined ? patch.value : a.value,
+      schedule: patch.schedule ?? a.schedule,
+      note: patch.note !== undefined ? patch.note : a.note,
+    };
+    const { sym, type, val, sched } = AlertStore.validate(next);
+    a.symbol = sym;
+    a.type = type;
+    a.value = val;
+    a.schedule = sched;
+    if (patch.note !== undefined) a.note = String(patch.note || '');
+    if (patch.active !== undefined) a.active = !!patch.active;
+    if (type !== a.type || sym !== a.symbol) {
+      a.state = 'clear';
+      a.triggeredAt = null;
+    }
+    this.save();
+    return a;
   }
 
   remove(id) {

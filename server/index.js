@@ -9,11 +9,12 @@ import {
   fetchQuote,
   fetchSentiment,
   getSnapshot,
+  scaleRowsToPrice,
   scanUniverse,
   sliceRange,
 } from './data.js';
 import { AlertStore } from './alerts.js';
-import { DEFAULT_UNIVERSE } from './universe.js';
+import { DEFAULT_UNIVERSE, SCAN_UNIVERSE, scanEntry } from './universe.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -22,14 +23,30 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 
 const settingsFile = path.join(DATA_DIR, 'settings.json');
-const defaultSettings = { stopPct: 15, lookback: 252, atrMult: 2, threshold: 5, universe: DEFAULT_UNIVERSE };
+const defaultSettings = { stopPct: 15, lookback: 252, atrMult: 2, threshold: 5, universe: DEFAULT_UNIVERSE, stops: {} };
+
+function sanitizeStops(stops) {
+  const out = {};
+  if (stops && typeof stops === 'object' && !Array.isArray(stops)) {
+    for (const [k, v] of Object.entries(stops)) {
+      const n = Number(v);
+      if (String(k).trim() && Number.isFinite(n) && n >= 1 && n <= 50) out[String(k).trim().toUpperCase()] = n;
+    }
+  }
+  return out;
+}
 
 function loadSettings() {
   try {
     const parsed = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
-    return { ...defaultSettings, ...parsed, universe: Array.isArray(parsed.universe) && parsed.universe.length ? parsed.universe : defaultSettings.universe };
+    return {
+      ...defaultSettings,
+      ...parsed,
+      universe: Array.isArray(parsed.universe) && parsed.universe.length ? parsed.universe : defaultSettings.universe,
+      stops: sanitizeStops(parsed.stops),
+    };
   } catch {
-    return { ...defaultSettings };
+    return { ...defaultSettings, stops: {} };
   }
 }
 function saveSettings(s) {
@@ -137,13 +154,16 @@ const server = http.createServer(async (req, res) => {
           const cleaned = [...new Set(body.universe.map((s) => String(s).trim().toUpperCase()).filter(Boolean))];
           if (cleaned.length) next.universe = cleaned;
         }
+        if (body.stops != null) next.stops = sanitizeStops(body.stops);
         settings = next;
         saveSettings(settings);
         return send(res, 200, settings);
       }
       if (p === '/api/scan' && req.method === 'GET') {
-        const rows = await scanUniverse(settings.universe, settings);
-        return send(res, 200, { settings, generatedAt: new Date().toISOString(), rows });
+        const scope = u.searchParams.get('scope') === 'tracked' ? 'tracked' : 'all';
+        const entries = scope === 'tracked' ? settings.universe : SCAN_UNIVERSE;
+        const rows = await scanUniverse(entries, settings);
+        return send(res, 200, { settings, generatedAt: new Date().toISOString(), scope, entries: scope === 'all' ? SCAN_UNIVERSE : undefined, rows });
       }
       if (p === '/api/quote' && req.method === 'GET') {
         const syms = (u.searchParams.get('symbols') || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -160,7 +180,12 @@ const server = http.createServer(async (req, res) => {
       if (p.startsWith('/api/history/') && req.method === 'GET') {
         const sym = decodeURIComponent(p.slice('/api/history/'.length));
         const range = u.searchParams.get('range') || '1y';
-        const h = await fetchHistory(sym, '2y');
+        const entry = scanEntry(sym);
+        let h = await fetchHistory(sym, '2y', { category: entry.category });
+        const quote = await fetchQuote(sym, { category: entry.category }).catch(() => null);
+        if (h.meta.proxy && quote?.price) {
+          h = { rows: scaleRowsToPrice(h.rows, quote.price), meta: h.meta };
+        }
         return send(res, 200, { symbol: sym, meta: h.meta, range, rows: sliceRange(h.rows, range) });
       }
       if (p === '/api/sentiment' && req.method === 'GET') return send(res, 200, await fetchSentiment());
@@ -177,9 +202,17 @@ const server = http.createServer(async (req, res) => {
       }
       const mAck = p.match(/^\/api\/alerts\/([^/]+)\/ack$/);
       if (mAck && req.method === 'POST') return send(res, 200, { alert: alerts.ack(mAck[1]) });
-      const mDel = p.match(/^\/api\/alerts\/([^/]+)$/);
-      if (mDel && req.method === 'DELETE') {
-        alerts.remove(mDel[1]);
+      const mAlert = p.match(/^\/api\/alerts\/([^/]+)$/);
+      if (mAlert && req.method === 'PATCH') {
+        const body = await readBody(req);
+        try {
+          return send(res, 200, { alert: alerts.update(mAlert[1], body) });
+        } catch (e) {
+          return send(res, e.statusCode || 400, { error: e.message });
+        }
+      }
+      if (mAlert && req.method === 'DELETE') {
+        alerts.remove(mAlert[1]);
         return send(res, 200, { ok: true });
       }
       return send(res, 404, { error: 'not found' });

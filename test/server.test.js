@@ -94,8 +94,32 @@ test('settings can be updated and persist', async () => {
   assert.equal(body.stopPct, 20);
   assert.equal(body.threshold, 7);
   assert.deepEqual(body.universe, ['AAPL', 'MSFT']);
-  const scan = await (await fetch(`${BASE}/api/scan`)).json();
+  const scan = await (await fetch(`${BASE}/api/scan?scope=tracked`)).json();
   assert.equal(scan.rows.length, 2);
+  assert.equal(scan.scope, 'tracked');
+  const scanAll = await (await fetch(`${BASE}/api/scan`)).json();
+  assert.ok(scanAll.rows.length >= 40, `wide scan covers 40+ names, got ${scanAll.rows.length}`);
+  assert.equal(scanAll.scope, 'all');
+  const withMeta = scanAll.rows.filter((r) => r.category && r.region);
+  assert.ok(withMeta.length >= 40, 'scanner rows carry category/region');
+  const withQuote = scanAll.rows.filter((r) => r.quote?.price > 0);
+  assert.ok(withQuote.length >= 5, 'quotes have source+price');
+  assert.ok(withQuote.every((r) => typeof r.quote.source === 'string'));
+});
+
+test('per-symbol stop overrides are accepted and applied', async () => {
+  const res = await fetch(`${BASE}/api/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stops: { AAPL: 25, bogus: 'x', MSFT: 99 } }),
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.stops, { AAPL: 25 });
+  const scan = await (await fetch(`${BASE}/api/scan?scope=tracked`)).json();
+  const aapl = scan.rows.find((r) => r.symbol === 'AAPL');
+  assert.equal(aapl.snapshot.stopPctUsed, 25);
+  assert.ok(Math.abs(aapl.snapshot.stop - aapl.snapshot.high * 0.75) < 1e-6);
 });
 
 test('alert CRUD + evaluation flow', async () => {
@@ -125,6 +149,24 @@ test('alert CRUD + evaluation flow', async () => {
   await fetch(`${BASE}/api/alerts/${created.id}/ack`, { method: 'POST', body: '{}' });
   const list2 = await (await fetch(`${BASE}/api/alerts`)).json();
   assert.equal(list2.alerts.find((a) => a.id === created.id).acknowledged, true);
+
+  const patch = await fetch(`${BASE}/api/alerts/${created.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'below', value: 123.45, note: 'edited' }),
+  });
+  assert.equal(patch.status, 200);
+  const patched = (await patch.json()).alert;
+  assert.equal(patched.type, 'below');
+  assert.equal(patched.value, 123.45);
+  assert.equal(patched.note, 'edited');
+
+  const badPatch = await fetch(`${BASE}/api/alerts/${created.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'below', value: 'abc' }),
+  });
+  assert.equal(badPatch.status, 400);
 
   const del = await fetch(`${BASE}/api/alerts/${created.id}`, { method: 'DELETE' });
   assert.equal(del.status, 200);

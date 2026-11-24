@@ -43,7 +43,37 @@ export function nasdaqSymbol(symbol) {
   const s = String(symbol).toUpperCase();
   if (!s.includes('.')) return s;
   const base = s.split('.')[0];
+  if (!base) return s;
   return ADR_MAP[base] || base;
+}
+
+// Crypto USD pairs resolve through CoinGecko (CoinGecko has no CNBC/Yahoo presence here).
+export const CRYPTO_IDS = {
+  'BTC-USD': 'bitcoin',
+  'ETH-USD': 'ethereum',
+  'SOL-USD': 'solana',
+  'XRP-USD': 'ripple',
+  'ADA-USD': 'cardano',
+};
+export function isCrypto(symbol) {
+  return Object.prototype.hasOwnProperty.call(CRYPTO_IDS, String(symbol).toUpperCase());
+}
+
+// Indices quote real-time from CNBC (.SPX etc.). For daily history there is no Nasdaq
+// index feed, so fall back to a proxy ETF whose series is rescaled to the index level
+// (uniform scaling keeps every percentage and the stop correct in index points).
+export const INDEX_YAHOO = { '.SPX': '^GSPC', '.DJI': '^DJI', '.IXIC': '^IXIC', '.VIX': '^VIX' };
+export const INDEX_PROXY = { '.SPX': 'SPY', '.DJI': 'DIA', '.IXIC': 'QQQ', '.VIX': 'VIXY' };
+export function isIndex(symbol) {
+  return Object.prototype.hasOwnProperty.call(INDEX_YAHOO, String(symbol).toUpperCase());
+}
+
+export function scaleRowsToPrice(rows, price) {
+  const last = rows[rows.length - 1];
+  if (!last || !last.c || !price) return rows;
+  const k = price / last.c;
+  if (!Number.isFinite(k) || k <= 0 || Math.abs(k - 1) < 1e-12) return rows;
+  return rows.map((r) => ({ ...r, o: r.o != null ? r.o * k : r.o, h: r.h != null ? r.h * k : r.h, l: r.l != null ? r.l * k : r.l, c: r.c * k }));
 }
 
 function nasdaqNum(v) {
@@ -55,12 +85,12 @@ function nasdaqDate(d) {
   return Date.UTC(Number(y), Number(m) - 1, Number(day), 16);
 }
 
-async function fetchHistoryNasdaq(symbol) {
+async function fetchHistoryNasdaq(symbol, assetclass = 'stocks') {
   const sym = nasdaqSymbol(symbol);
   const to = new Date();
   const from = new Date(to.getTime() - 2 * 366 * 86400000);
   const fmt = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-  const url = `https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/historical?assetclass=stocks&fromdate=${fmt(from)}&todate=${fmt(to)}&limit=10000`;
+  const url = `https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/historical?assetclass=${assetclass}&fromdate=${fmt(from)}&todate=${fmt(to)}&limit=10000`;
   const j = JSON.parse(await httpGet(url, 15000, NASDAQ_HEADERS));
   const raw = j?.data?.tradesTable?.rows;
   if (!Array.isArray(raw) || !raw.length) throw new Error('nasdaq: empty');
@@ -71,7 +101,7 @@ async function fetchHistoryNasdaq(symbol) {
   if (!rows.length) throw new Error('nasdaq: no valid rows');
   let name = sym;
   try {
-    const info = JSON.parse(await httpGet(`https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/info?assetclass=stocks`, 8000, NASDAQ_HEADERS));
+    const info = JSON.parse(await httpGet(`https://api.nasdaq.com/api/quote/${encodeURIComponent(sym)}/info?assetclass=${assetclass}`, 8000, NASDAQ_HEADERS));
     name = info?.data?.companyName || sym;
   } catch {
     /* best effort */
@@ -92,6 +122,7 @@ const YAHOO_TO_STOOQ = {
 
 export function yahooToStooq(symbol) {
   const s = String(symbol).toUpperCase();
+  if (INDEX_YAHOO[s]) return INDEX_YAHOO[s].toLowerCase();
   for (const [y, st] of Object.entries(YAHOO_TO_STOOQ)) {
     if (s.endsWith(y)) return s.slice(0, -y.length) + st;
   }
@@ -102,10 +133,16 @@ export function yahooToStooq(symbol) {
 
 export function guessCurrency(symbol) {
   const s = String(symbol).toUpperCase();
-  if (['.AS', '.AD', '.HE', '.AMS', '.PA', '.FP', '.DE', '.XETRA', '.F', '.BE', '.MU', '.MI', '.MC'].some((x) => s.endsWith(x))) return 'EUR';
+  if (isCrypto(s)) return 'USD';
+  if (isIndex(s)) return 'USD';
+  if (['.AS', '.AD', '.HE', '.AMS', '.PA', '.FP', '.DE', '.XETRA', '.F', '.BE', '.MU', '.MI', '.MC', '.NL'].some((x) => s.endsWith(x))) return 'EUR';
   if (s.endsWith('.L') || s.endsWith('.LN')) return 'GBp';
   if (s.endsWith('.SW') || s.endsWith('.VX')) return 'CHF';
   if (s.endsWith('.TO') || s.endsWith('.CN')) return 'CAD';
+  if (s.endsWith('.T')) return 'JPY';
+  if (s.endsWith('.KS')) return 'KRW';
+  if (s.endsWith('.NS') || s.endsWith('.BO')) return 'INR';
+  if (s.endsWith('.HK')) return 'HKD';
   return 'USD';
 }
 
@@ -146,8 +183,61 @@ export async function fetchQuoteCnbc(symbol) {
   };
 }
 
+async function fetchQuoteCoingecko(symbol) {
+  const id = CRYPTO_IDS[String(symbol).toUpperCase()];
+  const j = JSON.parse(await httpGet(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_last_updated_at=true`, 8000));
+  const p = j?.[id]?.usd;
+  if (!Number.isFinite(p) || p <= 0) throw new Error('coingecko: no price');
+  const updated = j[id].last_updated_at ? new Date(j[id].last_updated_at * 1000).toISOString() : new Date().toISOString();
+  return {
+    symbol,
+    price: p,
+    prevClose: null,
+    changePct: null,
+    time: updated,
+    asOf: updated,
+    currency: 'USD',
+    name: `${symbol} (crypto)`,
+    realTime: true,
+    source: 'coingecko',
+  };
+}
+
+async function fetchHistoryCoingecko(symbol) {
+  const id = CRYPTO_IDS[String(symbol).toUpperCase()];
+  const j = JSON.parse(await httpGet(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=400`, 12000));
+  const prices = j?.prices;
+  if (!Array.isArray(prices) || !prices.length) throw new Error('coingecko: empty chart');
+  const rows = prices
+    .filter((p) => Array.isArray(p) && Number.isFinite(p[1]) && p[1] > 0)
+    .map((p) => ({ t: p[0], o: p[1], h: p[1], l: p[1], c: p[1], v: 0 }));
+  if (!rows.length) throw new Error('coingecko: no valid rows');
+  return { rows, meta: { name: `${symbol} (crypto)`, currency: 'USD', exchange: 'CoinGecko', source: 'coingecko' } };
+}
+
+async function fetchQuoteYahooV7(symbol) {
+  const j = JSON.parse(await httpGet(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`, 8000));
+  const q = j?.quoteResponse?.result?.[0];
+  const price = q?.regularMarketPrice;
+  if (!q || !Number.isFinite(price) || price <= 0) throw new Error('yahoo: no quote');
+  const t = q.regularMarketTime ? new Date(q.regularMarketTime * 1000).toISOString() : new Date().toISOString();
+  return {
+    symbol,
+    price,
+    prevClose: Number.isFinite(q.regularMarketPreviousClose) ? q.regularMarketPreviousClose : null,
+    changePct: Number.isFinite(q.regularMarketChangePercent) ? q.regularMarketChangePercent : null,
+    time: t,
+    asOf: t,
+    currency: q.currency || guessCurrency(symbol),
+    name: q.shortName || q.longName || symbol,
+    realTime: true,
+    source: 'yahoo',
+  };
+}
+
 async function fetchHistoryYahoo(symbol, range = '2y') {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`;
+  const yahooSym = INDEX_YAHOO[String(symbol).toUpperCase()] || symbol;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?range=${range}&interval=1d`;
   const json = JSON.parse(await httpGet(url));
   const r = json?.chart?.result?.[0];
   if (!r) throw new Error('yahoo: no result');
@@ -203,34 +293,45 @@ async function fetchHistoryStooq(symbol) {
   return { rows, meta: { name: symbol, currency: guessCurrency(symbol), exchange: '', source: 'stooq' } };
 }
 
-export async function fetchHistory(symbol, range = '2y') {
+export async function fetchHistory(symbol, range = '2y', opts = {}) {
   if (DEMO) {
-    return { rows: demoHistory(symbol), meta: { name: symbol, currency: guessCurrency(symbol), demo: true } };
+    return { rows: demoHistory(symbol), meta: { name: symbol, currency: guessCurrency(symbol), demo: true, source: 'demo' } };
   }
-  const key = `hist:${symbol}`;
+  const key = `hist:${symbol}:${opts.category || ''}`;
   const hit = cacheGet(key, 5 * 60_000);
   if (hit) return hit;
-  let out;
-  try {
-    out = await fetchHistoryYahoo(symbol, range === '5y' ? '5y' : '2y');
-  } catch {
+  const s = String(symbol).toUpperCase();
+  const tries = [];
+  if (isCrypto(s)) {
+    tries.push(['coingecko', () => fetchHistoryCoingecko(s)]);
+    tries.push(['yahoo', () => fetchHistoryYahoo(s, range)]);
+    tries.push(['stooq', () => fetchHistoryStooq(s)]);
+  } else if (isIndex(s)) {
+    tries.push(['yahoo', () => fetchHistoryYahoo(s, range)]);
+    tries.push(['stooq', () => fetchHistoryStooq(s)]);
+    const proxy = INDEX_PROXY[s];
+    if (proxy) tries.push([`nasdaq(${proxy})`, () => fetchHistoryNasdaq(proxy, 'etf').then((h) => ({ rows: h.rows, meta: { ...h.meta, name: `${s} (history via ${proxy}, scaled)`, proxy, proxyFor: s, source: 'nasdaq-proxy' } }))]);
+  } else {
+    tries.push(['yahoo', () => fetchHistoryYahoo(s, range)]);
+    tries.push(['nasdaq', () => fetchHistoryNasdaq(s, opts.category === 'etf' ? 'etf' : 'stocks')]);
+    tries.push(['stooq', () => fetchHistoryStooq(s)]);
+  }
+  let lastErr;
+  for (const [name, fn] of tries) {
     try {
-      out = await fetchHistoryNasdaq(symbol);
-    } catch {
-      try {
-        out = await fetchHistoryStooq(symbol);
-      } catch (e2) {
-        const err = new Error(`history unavailable for ${symbol} (${e2.message})`);
-        err.code = 'UPSTREAM';
-        throw err;
-      }
+      const out = await fn();
+      cacheSet(key, out);
+      return out;
+    } catch (e) {
+      lastErr = e;
     }
   }
-  cacheSet(key, out);
-  return out;
+  const err = new Error(`history unavailable for ${symbol} (${lastErr?.message || 'all sources failed'})`);
+  err.code = 'UPSTREAM';
+  throw err;
 }
 
-export async function fetchQuote(symbol) {
+export async function fetchQuote(symbol, opts = {}) {
   if (DEMO) {
     const h = await fetchHistory(symbol, '5d');
     return { ...demoQuote(symbol, h.rows, h.meta.currency), source: 'demo', asOf: new Date().toISOString() };
@@ -238,37 +339,44 @@ export async function fetchQuote(symbol) {
   const key = `q:${symbol}`;
   const hit = cacheGet(key, 20_000);
   if (hit) return hit;
-  let q = null;
-  try {
-    const txt = await httpGet(`https://stooq.com/q/l/?s=${yahooToStooq(symbol)}&f=sd2t2ohlcv&h&e=csv`, 8000);
-    const lines = txt.trim().split('\n');
-    const parts = lines[lines.length - 1].split(',');
-    const close = parseFloat(parts[6]);
-    if (Number.isFinite(close) && close > 0) {
-      q = {
+  const s = String(symbol).toUpperCase();
+  const tries = [];
+  if (isCrypto(s)) {
+    tries.push(['coingecko', () => fetchQuoteCoingecko(s)]);
+    tries.push(['yahoo', () => fetchQuoteYahooV7(s)]);
+  } else {
+    tries.push(['cnbc', () => fetchQuoteCnbc(s)]);
+    tries.push(['yahoo', () => fetchQuoteYahooV7(s)]);
+    tries.push(['stooq', async () => {
+      const txt = await httpGet(`https://stooq.com/q/l/?s=${yahooToStooq(s)}&f=sd2t2ohlcv&h&e=csv`, 8000);
+      const lines = txt.trim().split('\n');
+      const parts = lines[lines.length - 1].split(',');
+      const close = parseFloat(parts[6]);
+      if (!Number.isFinite(close) || close <= 0) throw new Error('stooq: no price');
+      return {
         symbol,
         price: close,
         prevClose: close,
         changePct: 0,
         time: `${parts[1] || ''} ${parts[2] || ''}`.trim(),
         asOf: new Date().toISOString(),
-        currency: guessCurrency(symbol),
+        currency: guessCurrency(s),
         source: 'stooq',
         realTime: true,
       };
-    }
-  } catch {
-    q = null;
+    }]);
   }
-  if (!q) {
+  let q = null;
+  for (const [, fn] of tries) {
     try {
-      q = await fetchQuoteCnbc(symbol);
+      q = await fn();
+      break;
     } catch {
       q = null;
     }
   }
   if (!q) {
-    const h = await fetchHistory(symbol, '5d');
+    const h = await fetchHistory(s, '5d', opts);
     const rows = h.rows;
     const last = rows[rows.length - 1];
     const prev = rows[rows.length - 2];
@@ -290,30 +398,29 @@ export async function fetchQuote(symbol) {
   return q;
 }
 
-export async function getSnapshot(symbol, settings) {
-  const h = await fetchHistory(symbol, '2y');
-  const snap = computeSnapshot(h.rows, { ...settings, symbol });
-  return { ...snap, meta: h.meta, rows: h.rows };
+export function effectiveStopPct(symbol, settings) {
+  const over = settings?.stops?.[String(symbol).toUpperCase()];
+  return Number.isFinite(Number(over)) ? Number(over) : (settings?.stopPct ?? 15);
 }
 
-export async function scanUniverse(symbols, settings) {
-  const rows = [];
-  let idx = 0;
-  const concurrency = 4;
-  async function worker() {
-    while (idx < symbols.length) {
-      const sym = symbols[idx++];
-      try {
-        const snap = await getSnapshot(sym, settings);
-        const quote = await fetchQuote(sym).catch(() => null);
-        const { rows: histRows, ...snapOut } = snap;
-        rows.push({ symbol: sym, quote, snapshot: { ...snapOut, spark: histRows.slice(-60).map((r) => r.c) }, meta: snap.meta });
-      } catch (e) {
-        rows.push({ symbol: sym, error: e.message });
-      }
-    }
+export async function getSnapshot(symbol, settings, opts = {}) {
+  const s = String(symbol).toUpperCase();
+  const category = opts.category || (isCrypto(s) ? 'crypto' : isIndex(s) ? 'index' : 'stock');
+  let h = await fetchHistory(s, '2y', { category });
+  let quote = null;
+  try {
+    quote = await fetchQuote(s, { category });
+  } catch {
+    quote = null;
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, symbols.length) }, () => worker()));
+  if (h.meta.proxy && quote?.price) {
+    h = { rows: scaleRowsToPrice(h.rows, quote.price), meta: h.meta };
+  }
+  const snap = computeSnapshot(h.rows, { ...settings, stopPct: effectiveStopPct(s, settings), symbol: s });
+  return { ...snap, meta: h.meta, rows: h.rows, quote };
+}
+
+function sortByDist(rows) {
   rows.sort((a, b) => {
     const da = a.snapshot?.dist;
     const db = b.snapshot?.dist;
@@ -323,6 +430,38 @@ export async function scanUniverse(symbols, settings) {
     return da - db;
   });
   return rows;
+}
+
+// entries: strings or { symbol, category, region, note }. Quote and history are fetched
+// independently so a symbol with a live quote but no history still shows its price.
+export async function scanUniverse(entries, settings) {
+  const list = (entries || []).map((e) => (typeof e === 'string' ? { symbol: e } : e));
+  const rows = [];
+  let idx = 0;
+  const concurrency = 4;
+  async function worker() {
+    while (idx < list.length) {
+      const entry = list[idx++];
+      const sym = String(entry.symbol).toUpperCase();
+      const category = entry.category || (isCrypto(sym) ? 'crypto' : isIndex(sym) ? 'index' : 'stock');
+      const quote = await fetchQuote(sym, { category }).catch((e) => ({ symbol: sym, error: e.message }));
+      let snapshot = null;
+      let meta = null;
+      let error = null;
+      try {
+        const snap = await getSnapshot(sym, settings, { category });
+        meta = snap.meta;
+        snapshot = { ...snap, spark: snap.rows.slice(-60).map((r) => r.c) };
+        delete snapshot.rows;
+        delete snapshot.quote;
+      } catch (e) {
+        error = e.message;
+      }
+      rows.push({ symbol: sym, category, region: entry.region || 'US', note: entry.note || null, quote: quote?.error ? null : quote, quoteError: quote?.error || null, snapshot, meta, error });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, () => worker()));
+  return sortByDist(rows);
 }
 
 export { RANGE_DAYS, sliceRange };

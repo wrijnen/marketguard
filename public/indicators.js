@@ -92,12 +92,92 @@ export function distanceToStopPct(close, stop) {
   return ((close - stop) / close) * 100;
 }
 
+export const CHECK_DIST_PCT = 40;
+
 export function statusFor(dist, threshold = 5) {
   if (dist == null || Number.isNaN(dist)) return 'unknown';
+  if (Math.abs(dist) > CHECK_DIST_PCT) return 'check';
   if (dist <= 0) return 'breached';
   if (dist <= threshold) return 'near';
   if (dist <= 10) return 'watch';
   return 'safe';
+}
+
+// Heuristic split adjustment: if two consecutive sessions (gap <= 7 days) differ by a
+// ratio close to a common split factor (2:1, 3:1, 10:1, 1:2, ...), rescale all earlier
+// prices into the new unit so the series is continuous (adjusted-close basis). A plain
+// crash does not match a round split factor and is left untouched.
+const SPLIT_FACTORS = [1 / 20, 1 / 15, 1 / 10, 1 / 7, 1 / 5, 1 / 4, 1 / 3, 1 / 2, 2, 3, 4, 5, 7, 10, 15, 20];
+
+export function adjustSplits(hist) {
+  const rows = (hist || []).map((r) => ({ ...r }));
+  let splits = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const prev = rows[i - 1];
+    const cur = rows[i];
+    if (!prev || !cur || prev.c == null || cur.c == null || prev.c <= 0 || cur.c <= 0) continue;
+    const gapDays = cur.t != null && prev.t != null ? (cur.t - prev.t) / 86400000 : 1;
+    if (gapDays > 7) continue;
+    const ratio = cur.c / prev.c;
+    const isSplit = SPLIT_FACTORS.some((f) => Math.abs(ratio / f - 1) < 0.03);
+    if (isSplit) {
+      splits++;
+      for (let j = 0; j < i; j++) {
+        const r = rows[j];
+        if (r.c != null) r.c *= ratio;
+        if (r.o != null) r.o *= ratio;
+        if (r.h != null) r.h *= ratio;
+        if (r.l != null) r.l *= ratio;
+      }
+    }
+  }
+  return { rows, splits };
+}
+
+// Breach / recovery / reset events over the daily history, using the same trailing
+// stop series as the snapshot. "reset" = the stop stepped down because the old
+// lookback high aged out of the window.
+export function computeEvents(hist, opts = {}) {
+  const rows = (hist || []).filter((r) => r && r.c != null && Number.isFinite(r.c));
+  if (rows.length < 2) return [];
+  const lookback = opts.lookback ?? 252;
+  const stopPct = opts.stopPct ?? 15;
+  const closes = rows.map((r) => r.c);
+  const stops = stopSeries(closes, lookback, stopPct);
+  const events = [];
+  let breached = false;
+  for (let i = 1; i < rows.length; i++) {
+    const stop = stops[i];
+    if (stop == null) continue;
+    const prevStop = stops[i - 1];
+    const base = { t: rows[i].t, date: new Date(rows[i].t).toISOString(), price: closes[i], stop, source: opts.source || null };
+    if (prevStop != null && stop < prevStop * (1 - 1e-9)) events.push({ type: 'reset', ...base });
+    if (closes[i] <= stop && !breached) {
+      breached = true;
+      events.push({ type: 'breach', ...base });
+    } else if (closes[i] > stop && breached) {
+      breached = false;
+      events.push({ type: 'recovery', ...base });
+    }
+  }
+  return events;
+}
+
+export function stopRuleText(settings = {}) {
+  const stopPct = settings.stopPct ?? 15;
+  const lookback = settings.lookback ?? 252;
+  const atrMult = settings.atrMult ?? 2;
+  const lb =
+    lookback >= 252 ? 'past year (252 sessions)'
+    : lookback >= 126 ? 'past 6 months (126 sessions)'
+    : lookback >= 63 ? 'past 3 months (63 sessions)'
+    : `past ${lookback} sessions`;
+  const rule = `Stop = ${stopPct}% below the highest close of the ${lb}` + (atrMult ? `; ATR stop = 1Y high − ${atrMult}×ATR(14) shown in the detail chart` : '') + '.';
+  const tooltip =
+    'The stop ratchets up with new highs and never moves down while that high is inside the lookback window; when the old high ages out of the window the stop steps down (logged as a "reset" in the History tab). ' +
+    'A breach does not lower the stop (MarketGuard-style): the row stays "Breached" until the price recovers above the stop. ' +
+    'Prices are split-adjusted automatically; any stop more than 40% away from the price is flagged "Check data".';
+  return { rule, tooltip };
 }
 
 export const BADGES = [
@@ -113,7 +193,8 @@ export const BADGES = [
 ];
 
 export function computeSnapshot(hist, opts = {}) {
-  const rows = (hist || []).filter((r) => r && r.c != null && Number.isFinite(r.c));
+  const adjusted = adjustSplits(hist);
+  const rows = adjusted.rows.filter((r) => r && r.c != null && Number.isFinite(r.c));
   if (!rows.length) return null;
   const closes = rows.map((r) => r.c);
   const highs = rows.map((r) => (r.h != null && Number.isFinite(r.h) ? r.h : r.c));
@@ -172,6 +253,8 @@ export function computeSnapshot(hist, opts = {}) {
   return {
     symbol: opts.symbol ?? null,
     asOf: rows[rows.length - 1].t,
+    splitsAdjusted: adjusted.splits,
+    stopPctUsed: stopPct,
     close,
     prevClose,
     changePct,
