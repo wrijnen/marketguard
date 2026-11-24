@@ -10,6 +10,19 @@ const STATUS_META = {
 
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£', GBp: 'p', CHF: 'CHF ', CAD: 'C$', SEK: 'kr', DKK: 'kr' };
 
+const ALERT_TYPES = ['below', 'above', 'near_stop', 'stop_breach', 'recovery'];
+const ALERT_TYPE_LABELS = {
+  below: 'price drops below',
+  above: 'price rises above',
+  near_stop: 'within % of stop-loss',
+  stop_breach: 'stop-loss breached',
+  recovery: 'recovers above stop-loss',
+};
+const ALERT_SCHEDULES = ['realtime', 'daily', 'weekly'];
+const ALERT_SCHEDULE_LABELS = { realtime: 'real-time', daily: 'daily 17:45', weekly: 'weekly Fri 16:30' };
+
+const STALE_MS = 15 * 60 * 1000;
+
 const LS_SETTINGS = 'sla_settings_overrides';
 const LS_ALERTS = 'sla_alerts';
 const LS_LOG = 'sla_alerts_log';
@@ -18,6 +31,8 @@ const state = {
   mode: 'server',
   settings: null,
   scan: [],
+  scanGeneratedAt: null,
+  scanSource: null,
   alerts: [],
   log: [],
   sentiment: null,
@@ -28,8 +43,10 @@ const state = {
   demo: false,
   histCache: new Map(),
   indexCache: null,
+  scanJsonCache: null,
   baseSettingsCache: null,
   lastGen: null,
+  digest: { daily: [], weekly: [], lastDaily: 0, lastWeekly: 0 },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -62,13 +79,18 @@ async function detectMode() {
 
 async function fetchJson(url) {
   const r = await fetch(url, { cache: 'no-cache' });
-  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 
 async function indexCache() {
   if (!state.indexCache) state.indexCache = await fetchJson('data/index.json');
   return state.indexCache;
+}
+
+async function scanJsonCache() {
+  if (!state.scanJsonCache) state.scanJsonCache = await fetchJson('data/scan.json');
+  return state.scanJsonCache;
 }
 
 async function baseSettings() {
@@ -89,6 +111,13 @@ async function historyOf(sym) {
 
 async function staticScan() {
   const idx = await indexCache();
+  let scanJson = null;
+  try {
+    scanJson = await scanJsonCache();
+  } catch {
+    scanJson = null;
+  }
+  const qBySym = new Map((scanJson?.rows || []).filter((r) => r.quote).map((r) => [r.symbol, r.quote]));
   const settings = mergedSettings();
   const rows = [];
   await Promise.all(
@@ -100,22 +129,25 @@ async function staticScan() {
         const closes = hj.rows.map((r) => r.c);
         const last = closes[closes.length - 1];
         const prev = closes[closes.length - 2];
+        const fallbackQuote = {
+          symbol: sym,
+          price: last,
+          prevClose: prev ?? last,
+          changePct: prev ? ((last - prev) / prev) * 100 : 0,
+          time: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
+          asOf: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
+          currency: hj.meta?.currency,
+          name: hj.meta?.name,
+          source: `${hj.meta?.source || 'history'}-close`,
+        };
         rows.push({
           symbol: sym,
           meta: hj.meta,
-          quote: {
-            symbol: sym,
-            price: last,
-            prevClose: prev ?? last,
-            changePct: prev ? ((last - prev) / prev) * 100 : 0,
-            time: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
-            currency: hj.meta?.currency,
-            name: hj.meta?.name,
-          },
+          quote: qBySym.get(sym) || fallbackQuote,
           snapshot: { ...snap, spark: closes.slice(-60) },
         });
       } catch (e) {
-        rows.push({ symbol: sym, error: e.message });
+        rows.push({ symbol: sym, error: 'no data' });
       }
     })
   );
@@ -133,9 +165,9 @@ async function staticScan() {
 function staticAlertAdd(body) {
   const sym = String(body.symbol || '').trim().toUpperCase();
   if (!sym) throw new Error('symbol is required');
-  if (!['below', 'above', 'near_stop', 'stop_breach'].includes(body.type)) throw new Error('invalid type');
+  if (!ALERT_TYPES.includes(body.type)) throw new Error('invalid type');
   let val = null;
-  if (body.type !== 'stop_breach') {
+  if (body.type !== 'stop_breach' && body.type !== 'recovery') {
     val = Number(body.value);
     if (!Number.isFinite(val)) throw new Error('value must be a number');
   }
@@ -145,6 +177,7 @@ function staticAlertAdd(body) {
     type: body.type,
     value: val,
     note: String(body.note || ''),
+    schedule: ALERT_SCHEDULES.includes(body.schedule) ? body.schedule : 'realtime',
     active: true,
     state: 'clear',
     acknowledged: false,
@@ -181,6 +214,9 @@ async function staticEvaluate() {
     } else if (a.type === 'stop_breach') {
       cond = s.stop != null && price <= s.stop;
       msg = `${a.symbol} stop-loss breached, ${price} at or below stop ${s.stop}`;
+    } else if (a.type === 'recovery') {
+      cond = s.badges?.includes('recovered') && (s.dist ?? 0) > 0;
+      msg = `${a.symbol} recovered above its stop-loss, distance ${s.dist?.toFixed(2)}%, price ${price}`;
     } else if (a.type === 'near_stop') {
       cond = s.dist != null && s.dist <= a.value;
       msg = `${a.symbol} within ${a.value}% of stop-loss, distance ${s.dist?.toFixed(2)}% against stop ${s.stop}`;
@@ -292,17 +328,17 @@ function notifyBrowser(title, body) {
 }
 
 function statusColor(dist) {
-  if (dist == null) return 'var(--color-muted)';
-  if (dist <= 0) return 'var(--color-accent)';
-  if (dist <= (state.settings?.threshold ?? 5)) return 'var(--color-accent-2)';
-  if (dist <= 10) return 'var(--color-muted)';
-  return 'var(--color-ink)';
+  if (dist == null) return 'var(--muted)';
+  if (dist <= 0) return 'var(--breach)';
+  if (dist <= (state.settings?.threshold ?? 5)) return 'var(--near)';
+  if (dist <= 10) return 'var(--muted)';
+  return 'var(--safe)';
 }
 
 function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || canvas.parentElement.clientWidth;
-  const h = canvas.clientHeight || 26;
+  const h = canvas.clientHeight || 30;
   canvas.width = w * dpr;
   canvas.height = h * dpr;
   const ctx = canvas.getContext('2d');
@@ -311,26 +347,47 @@ function setupCanvas(canvas) {
   return { ctx, w, h };
 }
 
-function drawSparkline(canvas, values) {
+function drawSparkline(canvas, values, stop) {
   if (!values || values.length < 2) return;
   const { ctx, w, h } = setupCanvas(canvas);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const all = stop != null ? [...values, stop] : values;
+  const min = Math.min(...all);
+  const max = Math.max(...all);
   const span = max - min || 1;
-  const px = (i) => (i / (values.length - 1)) * (w - 2) + 1;
-  const py = (v) => h - 2 - ((v - min) / span) * (h - 4);
+  const px = (i) => (i / (values.length - 1)) * (w - 6) + 3;
+  const py = (v) => h - 4 - ((v - min) / span) * (h - 8);
+  const up = values[values.length - 1] >= values[0];
+  const color = up ? 'var(--safe)' : 'var(--breach)';
+
+  if (stop != null) {
+    const y = py(stop);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.strokeStyle = 'var(--breach)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   ctx.beginPath();
   values.forEach((v, i) => (i ? ctx.lineTo(px(i), py(v)) : ctx.moveTo(px(i), py(v))));
-  ctx.strokeStyle = 'var(--color-ink)';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6;
   ctx.lineJoin = 'round';
   ctx.stroke();
+  ctx.lineTo(px(values.length - 1), h);
+  ctx.lineTo(px(0), h);
+  ctx.closePath();
+  ctx.fillStyle = up ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)';
+  ctx.fill();
 }
 
 function drawDetailChart(canvas, rows, snapshot) {
   const { ctx, w, h } = setupCanvas(canvas);
   if (!rows || rows.length < 2) return;
-  const padL = 52, padR = 12, padT = 12, padB = 22;
+  const padL = 56, padR = 12, padT = 12, padB = 22;
   const iw = w - padL - padR;
   const ih = h - padT - padB;
   const closes = rows.map((r) => r.c);
@@ -345,9 +402,9 @@ function drawDetailChart(canvas, rows, snapshot) {
   const px = (i) => padL + (i / (rows.length - 1)) * iw;
   const py = (v) => padT + ih - ((v - min) / span) * ih;
 
-  ctx.strokeStyle = 'var(--color-rule)';
-  ctx.fillStyle = 'var(--color-muted)';
-  ctx.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+  ctx.strokeStyle = 'rgba(139,150,173,0.14)';
+  ctx.fillStyle = 'var(--muted)';
+  ctx.font = '10px "Space Grotesk", ui-monospace, monospace';
   ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
     const v = min + (span * g) / 4;
@@ -356,7 +413,7 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.moveTo(padL, y);
     ctx.lineTo(w - padR, y);
     ctx.stroke();
-    ctx.fillText(fmtPrice(v), 2, y + 3);
+    ctx.fillText(fmtPrice(v), 4, y + 3);
   }
   ctx.fillText(fmtTime(rows[0].t), padL, h - 6);
   const lastLabel = fmtTime(rows[rows.length - 1].t);
@@ -379,80 +436,152 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.setLineDash([]);
   };
 
-  line(ma200, 'var(--color-muted)', 1, [3, 3]);
-  line(ma50, 'var(--color-ink-2)', 1, [3, 3]);
+  line(ma200, 'rgba(245,158,11,0.65)', 1.2);
+  line(ma50, 'rgba(34,211,238,0.65)', 1.2);
 
   if (snapshot?.stop != null) {
     ctx.beginPath();
     ctx.moveTo(padL, py(snapshot.stop));
     ctx.lineTo(w - padR, py(snapshot.stop));
-    ctx.strokeStyle = 'var(--color-rule-2)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'var(--breach)';
+    ctx.lineWidth = 1.6;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = 'var(--color-accent-2)';
+    ctx.fillStyle = 'var(--breach)';
     ctx.fillText(`stop ${fmtPrice(snapshot.stop)}`, padL + 6, py(snapshot.stop) - 5);
   }
 
-  line(closes, 'var(--color-accent)', 2);
+  const grad = ctx.createLinearGradient(0, padT, 0, padT + ih);
+  grad.addColorStop(0, 'rgba(99,102,241,0.28)');
+  grad.addColorStop(1, 'rgba(99,102,241,0)');
+  ctx.beginPath();
+  ctx.moveTo(px(0), py(closes[0]));
+  closes.forEach((v, i) => ctx.lineTo(px(i), py(v)));
+  ctx.lineTo(px(rows.length - 1), padT + ih);
+  ctx.lineTo(px(0), padT + ih);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  line(closes, 'var(--accent-hi)', 2);
 
   ctx.beginPath();
-  ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3, 0, Math.PI * 2);
-  ctx.fillStyle = 'var(--color-accent)';
+  ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'var(--accent-hi)';
   ctx.fill();
 }
 
-function badgeHtml(badges) {
-  if (!badges?.length) return '<span class="muted">n/a</span>';
-  return badges
-    .map((k) => {
-      const b = BADGES.find((x) => x.key === k);
-      return b ? `<span class="badge">${esc(b.label)}</span>` : '';
-    })
-    .join('');
+function badgeHtml(badges, cap = 3) {
+  if (!badges?.length) return '';
+  const shown = badges.slice(0, cap);
+  const more = badges.length - shown.length;
+  return (
+    shown
+      .map((k) => {
+        const b = BADGES.find((x) => x.key === k);
+        return b ? `<span class="badge">${esc(b.label)}</span>` : '';
+      })
+      .join('') + (more > 0 ? `<span class="badge more">+${more}</span>` : '')
+  );
 }
 
 function distCellHtml(dist) {
   if (dist == null) return '<span class="muted">n/a</span>';
+  const t = state.settings?.threshold ?? 5;
   const pct = Math.max(0, Math.min(100, (Math.min(dist, 30) / 30) * 100));
-  return `<div class="dist-cell"><div class="dist-bar"><div style="width:${pct}%"></div></div>
+  const tick = Math.max(0, Math.min(100, (Math.min(t, 30) / 30) * 100));
+  return `<div class="dist-cell" title="Bar scale 0–30%; tick marks the ${t}% alert threshold">
+    <div class="dist-bar"><div class="fill" style="width:${pct}%;background:${statusColor(dist)}"></div><div class="tick" style="left:${tick}%"></div></div>
     <span class="num" style="color:${statusColor(dist)}">${fmtPct(dist)}</span></div>`;
 }
 
-function rowHtml(r, point) {
-  const s = r.snapshot;
-  if (!s) {
-    return `<tr><td class="sym">${esc(r.symbol)}</td><td colspan="9" class="muted">${esc(r.error || 'no data')}</td></tr>`;
+function rowActionsHtml(r) {
+  return `<div class="row-actions">
+    <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}">chart</button>
+    <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}">alert</button>
+    <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
+  </div>`;
+}
+
+function errorRowHtml(r, inCard) {
+  const actions = inCard
+    ? `<div class="card-actions">
+        <button class="btn small" data-act="retry" data-symbol="${esc(r.symbol)}">Retry</button>
+        <button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>
+      </div>`
+    : `<div class="row-actions">
+        <button class="icon-btn" data-act="retry" data-symbol="${esc(r.symbol)}">retry</button>
+        <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
+      </div>`;
+  if (inCard) {
+    return `<div class="stock-card" data-symbol="${esc(r.symbol)}">
+      <div class="card-top"><span class="card-symbol">${esc(r.symbol)}</span></div>
+      <div class="empty" style="text-align:left;padding:6px 0">No data for this symbol right now. The quote source may not cover it.</div>
+      ${actions}
+    </div>`;
   }
+  return `<tr data-symbol="${esc(r.symbol)}"><td class="sym">${esc(r.symbol)}</td><td colspan="8" class="muted">No data for this symbol right now.</td><td>${actions}</td></tr>`;
+}
+
+function cardHtml(r) {
+  const s = r.snapshot;
+  if (!s) return errorRowHtml(r, true);
+  const q = r.quote || {};
+  const price = q.price ?? s.close;
+  const chg = q.changePct ?? s.changePct;
+  const cur = q.currency || r.meta?.currency;
+  const st = STATUS_META[s.status] || STATUS_META.unknown;
+  const asof = q.asOf || q.time;
+  return `<div class="stock-card status-${s.status}" data-symbol="${esc(r.symbol)}">
+    <div class="card-top">
+      <div><span class="card-symbol">${esc(r.symbol)}</span> <span class="card-name">${esc(r.meta?.name || '')}</span></div>
+      <span class="status-chip ${st.cls}">${st.label}</span>
+    </div>
+    <div class="card-top">
+      <div><span class="card-price">${fmtPrice(price, cur)}</span><div class="card-asof">${asof ? `as of ${fmtTime(asof)}${q.source ? ` · ${esc(q.source)}` : ''}` : ''}</div></div>
+      <span class="chg ${chg >= 0 ? 'up' : 'down'}">${fmtPct(chg)}</span>
+    </div>
+    <canvas class="spark" data-spark="${esc(r.symbol)}"></canvas>
+    <div class="stop-row"><span>Stop-loss <b>${fmtPrice(s.stop, cur)}</b></span><span>High <b>${fmtPrice(s.high, cur)}</b></span></div>
+    <div class="stop-row"><span>Distance to stop</span>${distCellHtml(s.dist)}</div>
+    <div class="badges">${badgeHtml(s.badges)}</div>
+    <div class="card-actions">
+      <button class="btn small" data-act="chart" data-symbol="${esc(r.symbol)}">Chart</button>
+      <button class="btn small" data-act="alert" data-symbol="${esc(r.symbol)}">Alert</button>
+      <button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">Remove</button>
+    </div>
+  </div>`;
+}
+
+function tableRowHtml(r, point) {
+  const s = r.snapshot;
+  if (!s) return errorRowHtml(r, false);
   const q = r.quote || {};
   const price = q.price ?? s.close;
   const chg = q.changePct ?? s.changePct;
   const cur = q.currency || r.meta?.currency;
   const st = STATUS_META[s.status] || STATUS_META.unknown;
   const rowCls = [point ? 'row-point' : '', s.status === 'breached' ? 'row-breached' : s.status === 'near' ? 'row-near' : ''].filter(Boolean).join(' ');
+  const asof = q.asOf || q.time;
   return `<tr class="${rowCls}" data-symbol="${esc(r.symbol)}">
     <td class="sym">${esc(r.symbol)}</td>
     <td class="name">${esc(r.meta?.name || '')}</td>
-    <td class="num">${fmtPrice(price, cur)}</td>
-    <td class="num" style="color:${chg >= 0 ? 'var(--color-ink)' : 'var(--color-accent-2)'}">${fmtPct(chg)}</td>
-    <td><canvas class="spark" data-spark="${esc(r.symbol)}"></canvas></td>
+    <td class="num">${fmtPrice(price, cur)}<div style="font-size:10px;color:var(--muted);font-weight:400">${asof ? fmtTime(asof) : ''}</div></td>
+    <td class="num" style="color:${chg >= 0 ? 'var(--safe)' : 'var(--breach)'}">${fmtPct(chg)}</td>
+    <td><canvas class="spark-sm" data-spark="${esc(r.symbol)}"></canvas></td>
     <td class="num">${fmtPrice(s.stop, cur)}</td>
     <td>${distCellHtml(s.dist)}</td>
     <td><span class="status-chip ${st.cls}">${st.label}</span></td>
     <td><div class="badges">${badgeHtml(s.badges)}</div></td>
-    <td><div class="row-actions">
-      <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}">chart</button>
-      <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}">alert</button>
-      <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
-    </div></td>
+    <td>${rowActionsHtml(r)}</td>
   </tr>`;
 }
 
-function paintSparklines(tbody) {
-  $$(`${tbody} .spark`).forEach((c) => {
+function paintSparklines(containerSel) {
+  $$(containerSel + ' .spark, ' + containerSel + ' .spark-sm').forEach((c) => {
     const row = state.scan.find((r) => r.symbol === c.dataset.spark);
-    if (row?.snapshot?.spark) drawSparkline(c, row.snapshot.spark);
+    if (row?.snapshot) drawSparkline(c, row.snapshot.spark, row.snapshot.stop);
   });
 }
 
@@ -463,44 +592,62 @@ function renderStats() {
   const safe = rows.filter((r) => r.snapshot.badges.includes('safeBuffer')).length;
   const recovered = rows.filter((r) => r.snapshot.badges.includes('recovered')).length;
   const t = state.settings?.threshold ?? 5;
-  $('#stats-row').innerHTML = `<div class="tally">
-    <div class="tally-item"><span class="k">Near stop, within ${t}%</span><span class="v">${near}</span></div>
-    <div class="tally-item"><span class="k">Stop breached</span><span class="v" style="color:var(--color-accent)">${breached}</span></div>
-    <div class="tally-item"><span class="k">Buffer over 10%</span><span class="v">${safe}</span></div>
-    <div class="tally-item"><span class="k">Recovered</span><span class="v">${recovered}</span></div>
-    <div class="tally-item"><span class="k">Tracked symbols</span><span class="v">${rows.length}</span></div>
-  </div>`;
+  $('#stats-row').innerHTML = `
+    <div class="stat-card"><div class="label">Near stop, within ${t}%</div><div class="value" style="color:var(--near)">${near}</div></div>
+    <div class="stat-card"><div class="label">Stop breached</div><div class="value" style="color:var(--breach)">${breached}</div></div>
+    <div class="stat-card"><div class="label">Safe buffer, over 10%</div><div class="value" style="color:var(--safe)">${safe}</div></div>
+    <div class="stat-card"><div class="label">Recovered</div><div class="value" style="color:var(--accent-hi)">${recovered}</div></div>
+    <div class="stat-card"><div class="label">Tracked symbols</div><div class="value">${rows.length}</div></div>`;
 }
 
 function renderDashboard() {
-  const tbody = $('#dash-tbody');
+  const grid = $('#cards-grid');
   const rows = [...state.scan].sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="empty">Loading the register…</div></td></tr>';
+    grid.innerHTML = '<div class="empty">Loading the dashboard…</div>';
     return;
   }
-  tbody.innerHTML = rows.map((r) => rowHtml(r, false)).join('');
-  paintSparklines('#dash-tbody');
+  grid.innerHTML = rows.map((r) => cardHtml(r)).join('');
+  paintSparklines('#cards-grid');
 }
 
 function renderScanner() {
   const t = state.settings?.threshold ?? 5;
   const tbody = $('#scan-tbody');
   const rows = state.scan.filter((r) => {
-    if (!r.snapshot) return false;
+    if (!r.snapshot) return true;
     if (state.filters.size && ![...state.filters].every((f) => r.snapshot.badges.includes(f))) return false;
     return true;
   });
   const withData = state.scan.filter((r) => r.snapshot);
   const within = withData.filter((r) => r.snapshot.dist != null && r.snapshot.dist <= t).length;
-  const gen = state.scan.generatedAt ? `, data as of ${fmtTime(state.scan.generatedAt)}` : '';
-  $('#scan-summary').textContent = `${within} of ${withData.length} positions within ${t}% of their stop, sorted closest first${gen}.${state.mode === 'static' ? ' Static snapshot.' : ''}`;
+  const gen = state.scanGeneratedAt ? `, snapshot ${fmtTime(state.scanGeneratedAt)}` : '';
+  $('#scan-summary').textContent = `${within} of ${withData.length} positions within ${t}% of their stop, sorted closest first${gen}.`;
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="10"><div class="empty">No matching positions.</div></td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map((r, i) => rowHtml(r, i === 0)).join('');
+  const firstWithData = rows.findIndex((r) => r.snapshot);
+  tbody.innerHTML = rows.map((r, i) => tableRowHtml(r, i === firstWithData)).join('');
   paintSparklines('#scan-tbody');
+}
+
+function renderStamp() {
+  const el = $('#stamp');
+  const gen = state.scanGeneratedAt;
+  if (!gen) {
+    el.textContent = 'no data yet';
+    return;
+  }
+  const ageMs = Date.now() - new Date(gen).getTime();
+  const mins = Math.max(0, Math.round(ageMs / 60000));
+  const src = state.scanSource || 'snapshot';
+  el.innerHTML = `updated <b>${esc(fmtTime(gen))}</b>, ${mins} min ago · <b>${esc(src)}</b>`;
+  el.title = 'Snapshot timestamp and quote source. Refreshed by GitHub Actions every 5 min on weekdays 13–22 UTC, every 30 min otherwise, and on code pushes.';
+  const stale = ageMs > STALE_MS;
+  const sb = $('#stale-badge');
+  sb.classList.toggle('hidden', !stale);
+  if (stale) sb.textContent = `stale data: ${mins} min old`;
 }
 
 function renderBadgeFilters() {
@@ -512,17 +659,22 @@ function renderBadgeFilters() {
 function renderAlerts() {
   const list = $('#alerts-list');
   if (!state.alerts.length) {
-    list.innerHTML = '<div class="empty">No alerts yet. Choose “New alert” or the alert action on any row.</div>';
+    list.innerHTML = `<div class="alerts-hint">
+      No alerts yet. Choose <b>New alert</b> above, or the <b>alert</b> action on any row.<br><br>
+      Example: <code>NVDA, stop-loss breached, real-time</code> notifies the moment the price is at or below its trailing stop.<br><br>
+      Types: price below/above a level, within a % of the stop, stop-loss breach, and recovery above the stop.<br>
+      Schedules: <b>real-time</b> notifies immediately; <b>daily 17:45</b> and <b>weekly Friday 16:30</b> collect triggers into a single digest. Digests are delivered in-app while this page is open; email delivery is not configured.
+    </div>`;
   } else {
     list.innerHTML = state.alerts
       .map((a) => {
-        const label = { below: `below ${a.value}`, above: `above ${a.value}`, near_stop: `within ${a.value}% of stop`, stop_breach: 'stop-loss breach' }[a.type];
+        const label = { below: `below ${a.value}`, above: `above ${a.value}`, near_stop: `within ${a.value}% of stop`, stop_breach: 'stop-loss breach', recovery: 'recovery above stop' }[a.type];
         return `<div class="alert-item ${a.state === 'triggered' && !a.acknowledged ? 'triggered' : ''}">
           <div class="top">
             <span class="title">${esc(a.symbol)}, ${esc(label)}</span>
             <span class="status-chip ${a.state === 'triggered' ? 'status-breached' : 'status-safe'}">${a.state === 'triggered' ? 'triggered' : 'active'}</span>
           </div>
-          <div class="meta">created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? `, fired ${esc(fmtTime(a.triggeredAt))}` : ''}${state.mode === 'static' ? ', stored in this browser' : ''}</div>
+          <div class="meta">${esc(ALERT_SCHEDULE_LABELS[a.schedule] || 'real-time')}, created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? `, fired ${esc(fmtTime(a.triggeredAt))}` : ''}${state.mode === 'static' ? ', stored in this browser' : ''}</div>
           ${a.note ? `<div class="note">${esc(a.note)}</div>` : ''}
           <div class="actions">
             ${a.state === 'triggered' && !a.acknowledged ? `<button class="btn small" data-ack="${esc(a.id)}">Acknowledge</button>` : ''}
@@ -555,9 +707,10 @@ function renderSentiment() {
   }
   pill.classList.remove('hidden');
   const score = Math.round(fg.score);
+  const color = score <= 25 ? 'var(--breach)' : score <= 45 ? 'var(--near)' : score <= 55 ? 'var(--muted)' : score <= 75 ? 'var(--safe)' : 'var(--accent-hi)';
   const vix = state.sentiment?.vix;
-  pill.innerHTML = `Fear &amp; Greed <b>${score}</b>, ${esc(fg.rating || '—')}${vix?.price ? `, VIX ${vix.price.toFixed(1)}` : ''}`;
-  pill.title = `CNN Fear & Greed ${score} (${fg.rating})\n1 week ago ${fg.weekAgo?.toFixed?.(0) ?? '—'}, 1 month ago ${fg.monthAgo?.toFixed?.(0) ?? '—'}, 1 year ago ${fg.yearAgo?.toFixed?.(0) ?? '—'}`;
+  pill.innerHTML = `<span class="fg-dot" style="background:${color}"></span> Fear &amp; Greed <b>${score}</b> ${esc(fg.rating || '')}${vix?.price ? `, VIX ${vix.price.toFixed(1)}` : ''}`;
+  pill.title = `CNN Fear & Greed ${score} (${fg.rating})\n1 week ago ${fg.weekAgo?.toFixed?.(0) ?? 'n/a'}, 1 month ago ${fg.monthAgo?.toFixed?.(0) ?? 'n/a'}, 1 year ago ${fg.yearAgo?.toFixed?.(0) ?? 'n/a'}`;
 }
 
 function renderSettingsInputs() {
@@ -566,6 +719,18 @@ function renderSettingsInputs() {
   $('#set-lookback').value = String(state.settings.lookback);
   $('#set-atrMult').value = state.settings.atrMult;
   $('#set-threshold').value = state.settings.threshold;
+}
+
+function renderPermStatus() {
+  const el = $('#perm-status');
+  if (!('Notification' in window)) {
+    el.textContent = 'notifications: unsupported';
+    el.className = 'perm-pill no';
+    return;
+  }
+  const p = Notification.permission;
+  el.textContent = `notifications: ${p === 'granted' ? 'on' : p === 'denied' ? 'blocked' : 'not asked'}`;
+  el.className = 'perm-pill ' + (p === 'granted' ? 'ok' : 'no');
 }
 
 async function openDetail(symbol) {
@@ -581,7 +746,7 @@ async function openDetail(symbol) {
     const row = scan.rows.find((r) => r.symbol === symbol);
     renderDetailModal(symbol, h, row?.snapshot);
   } catch (e) {
-    modal.innerHTML = `<div class="empty">${esc(e.message)}</div><div class="modal-actions"><button class="btn" id="modal-close2">Close</button></div>`;
+    modal.innerHTML = `<div class="empty">No chart data for ${esc(symbol)}.</div><div class="modal-actions"><button class="btn" id="modal-close2">Close</button></div>`;
     $('#modal-close2').onclick = closeModal;
   }
 }
@@ -595,22 +760,22 @@ function renderDetailModal(symbol, h, snapshot) {
   modal.innerHTML = `
     <button class="btn small ghost modal-close" id="modal-close">Close</button>
     <h3>${esc(symbol)}</h3>
-    <div class="sub">${esc(h.meta?.name || '')}${h.meta?.exchange ? `, ${esc(h.meta.exchange)}` : ''}</div>
-    <div class="sub">${fmtPrice(q?.price ?? s?.close, cur)} ${s ? `<span style="color:${(q?.changePct ?? s.changePct) >= 0 ? 'var(--color-ink)' : 'var(--color-accent-2)'}">${fmtPct(q?.changePct ?? s.changePct)}</span>` : ''}, stop-loss ${s ? fmtPrice(s.stop, cur) : '—'}, distance ${s ? fmtPct(s.dist) : '—'}</div>
+    <div class="sub">${esc(h.meta?.name || '')}${h.meta?.exchange ? `, ${esc(h.meta.exchange)}` : ''}${h.meta?.source ? `, history via ${esc(h.meta.source)}` : ''}</div>
+    <div class="sub">${fmtPrice(q?.price ?? s?.close, cur)} ${s ? `<span class="chg ${((q?.changePct ?? s.changePct) ?? 0) >= 0 ? 'up' : 'down'}">${fmtPct(q?.changePct ?? s.changePct)}</span>` : ''}${q?.asOf ? ` as of ${esc(fmtTime(q.asOf))}${q.source ? ` (${esc(q.source)})` : ''}` : ''}, stop-loss ${s ? fmtPrice(s.stop, cur) : 'n/a'}, distance ${s ? fmtPct(s.dist) : 'n/a'}</div>
     <div class="range-btns">${ranges.map((r) => `<button class="btn small ${r === state.detailRange ? 'active' : ''}" data-range="${r}">${r.toUpperCase()}</button>`).join('')}</div>
     <canvas class="chart-canvas" id="detail-chart"></canvas>
     <div class="detail-stats">
       ${s ? `
-      <div class="detail-stat"><div class="k">Stop-loss, ${state.settings?.stopPct}%</div><div class="v">${fmtPrice(s.stop, cur)}</div></div>
-      <div class="detail-stat"><div class="k">ATR stop, ${state.settings?.atrMult}×ATR</div><div class="v">${fmtPrice(s.stopAtr, cur)}</div></div>
+      <div class="detail-stat"><div class="k">Stop-loss, ${state.settings?.stopPct}%</div><div class="v" style="color:var(--breach)">${fmtPrice(s.stop, cur)}</div></div>
+      <div class="detail-stat"><div class="k">ATR stop, ${state.settings?.atrMult}×ATR</div><div class="v" style="color:var(--near)">${fmtPrice(s.stopAtr, cur)}</div></div>
       <div class="detail-stat"><div class="k">MA50</div><div class="v">${fmtPrice(s.ma50, cur)}</div></div>
       <div class="detail-stat"><div class="k">MA200</div><div class="v">${fmtPrice(s.ma200, cur)}</div></div>
-      <div class="detail-stat"><div class="k">Volatility, 30d</div><div class="v">${s.volPct == null ? '—' : s.volPct.toFixed(1) + '%'}</div></div>
+      <div class="detail-stat"><div class="k">Volatility, 30d</div><div class="v">${s.volPct == null ? 'n/a' : s.volPct.toFixed(1) + '%'}</div></div>
       <div class="detail-stat"><div class="k">3M trend</div><div class="v">${fmtPct(s.trend3m)}</div></div>
       <div class="detail-stat"><div class="k">From top</div><div class="v">${fmtPct(s.pctFromHigh)}</div></div>
-      <div class="detail-stat"><div class="k">ATR 14</div><div class="v">${s.atrPct == null ? '—' : s.atrPct.toFixed(2) + '%'}</div></div>` : ''}
+      <div class="detail-stat"><div class="k">ATR 14</div><div class="v">${s.atrPct == null ? 'n/a' : s.atrPct.toFixed(2) + '%'}</div></div>` : ''}
     </div>
-    <div class="badges" style="margin-bottom:10px">${s ? badgeHtml(s.badges) : ''}</div>
+    <div class="badges" style="margin-bottom:10px">${s ? badgeHtml(s.badges, 99) : ''}</div>
     <div class="modal-actions">
       <button class="btn primary" id="detail-alert">Set alert</button>
       <button class="btn ghost" id="detail-close">Close</button>
@@ -643,7 +808,7 @@ function openAlertModal(symbol = '') {
   modal.innerHTML = `
     <button class="btn small ghost modal-close" id="modal-close">Close</button>
     <h3>New alert</h3>
-    <div class="sub">${state.mode === 'static' ? 'Stored in this browser and checked locally against the latest snapshot.' : 'Checked server-side every 60 seconds; toast and browser notification on trigger.'}</div>
+    <div class="sub">${state.mode === 'static' ? 'Stored in this browser and checked locally every 30 s while the page is open.' : 'Checked server-side every 60 s; this page shows a toast and sends a browser notification while it is open.'}</div>
     <div class="form-grid">
       <label>Symbol
         <input id="f-symbol" list="universe-list" value="${esc(symbol)}" placeholder="AAPL" />
@@ -655,6 +820,14 @@ function openAlertModal(symbol = '') {
           <option value="above">Price rises above</option>
           <option value="near_stop">Within % of stop-loss</option>
           <option value="stop_breach">Stop-loss breached</option>
+          <option value="recovery">Recovers above stop-loss</option>
+        </select>
+      </label>
+      <label>Delivery
+        <select id="f-schedule">
+          <option value="realtime">Real-time</option>
+          <option value="daily">Daily digest, 17:45</option>
+          <option value="weekly">Weekly digest, Friday 16:30</option>
         </select>
       </label>
       <label class="full" id="f-value-wrap">Value <input id="f-value" type="number" step="any" placeholder="e.g. 150 or 5" /></label>
@@ -667,7 +840,7 @@ function openAlertModal(symbol = '') {
   const typeSel = $('#f-type');
   const valueWrap = $('#f-value-wrap');
   const syncValue = () => {
-    valueWrap.style.display = typeSel.value === 'stop_breach' ? 'none' : '';
+    valueWrap.style.display = typeSel.value === 'stop_breach' || typeSel.value === 'recovery' ? 'none' : '';
   };
   typeSel.onchange = syncValue;
   syncValue();
@@ -678,15 +851,72 @@ function openAlertModal(symbol = '') {
     const type = typeSel.value;
     const value = $('#f-value').value;
     const note = $('#f-note').value;
+    const schedule = $('#f-schedule').value;
     try {
-      await api('api/alerts', { method: 'POST', body: JSON.stringify({ symbol: symbol2, type, value, note }) });
+      await api('api/alerts', { method: 'POST', body: JSON.stringify({ symbol: symbol2, type, value, note, schedule }) });
       toast(`Alert created for ${symbol2}`);
       closeModal();
       await loadAlerts();
     } catch (e) {
-      toast(`Error: ${e.message}`);
+      toast(`Could not create alert: ${e.message}`);
     }
   };
+}
+
+function nextDailyDigest() {
+  const d = new Date();
+  d.setHours(17, 45, 0, 0);
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+  return d;
+}
+function nextWeeklyDigest() {
+  const d = new Date();
+  d.setHours(16, 30, 0, 0);
+  let add = (5 - d.getDay() + 7) % 7;
+  if (add === 0 && d.getTime() <= Date.now()) add = 7;
+  d.setDate(d.getDate() + add);
+  return d;
+}
+
+function flushDigests() {
+  const now = Date.now();
+  if (state.digest.daily.length && now >= nextDailyDigest().getTime() - 60_000 && now - state.digest.lastDaily > 60_000) {
+    const items = state.digest.daily.splice(0);
+    state.digest.lastDaily = now;
+    const body = items.slice(0, 3).map((e) => e.message).join(' | ') + (items.length > 3 ? ` | +${items.length - 3} more` : '');
+    toast(`Daily digest: ${items.length} alert${items.length > 1 ? 's' : ''} triggered`);
+    notifyBrowser(`Daily alert digest (${items.length})`, body);
+  }
+  if (state.digest.weekly.length && now >= nextWeeklyDigest().getTime() - 60_000 && now - state.digest.lastWeekly > 60_000) {
+    const items = state.digest.weekly.splice(0);
+    state.digest.lastWeekly = now;
+    const body = items.slice(0, 3).map((e) => e.message).join(' | ') + (items.length > 3 ? ` | +${items.length - 3} more` : '');
+    toast(`Weekly digest: ${items.length} alert${items.length > 1 ? 's' : ''} triggered`);
+    notifyBrowser(`Weekly alert digest (${items.length})`, body);
+  }
+}
+
+async function evaluateAlerts() {
+  try {
+    const { fired } = await api('api/evaluate', { method: 'POST', body: '{}' });
+    for (const f of fired || []) {
+      if (state.notified.has(f.entry.id)) continue;
+      state.notified.add(f.entry.id);
+      const alert = (state.alerts || []).find((a) => a.id === f.alert?.id || a.id === f.entry.alertId);
+      const schedule = f.alert?.schedule || alert?.schedule || 'realtime';
+      if (schedule === 'realtime') {
+        toast(`Alert: ${f.entry.message}`);
+        notifyBrowser('Stoploss Alert', f.entry.message);
+      } else {
+        state.digest[schedule].push(f.entry);
+        toast(`${f.entry.message} (queued for ${ALERT_SCHEDULE_LABELS[schedule]} digest)`);
+      }
+    }
+    if (fired?.length) await loadAlerts();
+    flushDigests();
+  } catch {
+    /* server may be restarting */
+  }
 }
 
 async function loadSettings() {
@@ -701,6 +931,7 @@ async function loadScan() {
       if (idx.generatedAt !== state.lastGen) {
         state.lastGen = idx.generatedAt;
         state.indexCache = idx;
+        state.scanJsonCache = null;
         state.histCache.clear();
       }
     } catch {
@@ -710,7 +941,9 @@ async function loadScan() {
   const data = await api('api/scan');
   state.settings = data.settings;
   state.scan = data.rows;
-  state.scan.generatedAt = data.generatedAt;
+  state.scanGeneratedAt = data.generatedAt || null;
+  const srcs = data.rows.map((r) => r.quote?.source).filter(Boolean);
+  state.scanSource = srcs.length ? srcs.sort((a, b) => srcs.filter((v) => v === a).length - srcs.filter((v) => v === b).length)[0] : null;
   const health = await api('api/health').catch(() => ({}));
   state.demo = !!health.demo;
   $('#demo-badge').classList.toggle('hidden', !state.demo);
@@ -718,6 +951,7 @@ async function loadScan() {
   renderDashboard();
   renderScanner();
   renderSettingsInputs();
+  renderStamp();
 }
 
 async function loadAlerts() {
@@ -733,21 +967,6 @@ async function loadSentiment() {
     renderSentiment();
   } catch {
     /* optional */
-  }
-}
-
-async function evaluateAlerts() {
-  try {
-    const { fired } = await api('api/evaluate', { method: 'POST', body: '{}' });
-    for (const f of fired || []) {
-      if (state.notified.has(f.entry.id)) continue;
-      state.notified.add(f.entry.id);
-      toast(`Alert: ${f.entry.message}`);
-      notifyBrowser('Stoploss Alert', f.entry.message);
-    }
-    if (fired?.length) await loadAlerts();
-  } catch {
-    /* server may be restarting */
   }
 }
 
@@ -796,6 +1015,27 @@ function init() {
 
   $('#new-alert-btn').onclick = () => openAlertModal('');
 
+  $('#notify-btn').onclick = async () => {
+    if (!('Notification' in window)) return toast('Notifications not supported in this browser');
+    const perm = await Notification.requestPermission();
+    renderPermStatus();
+    toast(perm === 'granted' ? 'Browser notifications enabled' : `Notification permission: ${perm}`);
+  };
+
+  $('#test-notify').onclick = async () => {
+    if (!('Notification' in window)) return toast('Notifications not supported in this browser');
+    if (Notification.permission !== 'granted') {
+      await Notification.requestPermission();
+      renderPermStatus();
+    }
+    if (Notification.permission === 'granted') {
+      notifyBrowser('Stoploss Alert test', 'This is a test notification. Alerts fire while this page is open.');
+      toast('Test notification sent');
+    } else {
+      toast('Notification permission not granted, nothing sent');
+    }
+  };
+
   document.addEventListener('click', async (e) => {
     const act = e.target.closest('[data-act]');
     if (act) {
@@ -808,8 +1048,14 @@ function init() {
         toast(`Removed ${symbol}`);
         return loadScan();
       }
+      if (kind === 'retry') {
+        state.histCache.delete(symbol);
+        if (state.mode === 'static') state.scanJsonCache = null;
+        toast(`Retrying ${symbol}…`);
+        return loadScan();
+      }
     }
-    const row = e.target.closest('#scan-tbody tr[data-symbol], #dash-tbody tr[data-symbol]');
+    const row = e.target.closest('#scan-tbody tr[data-symbol]');
     if (row && !e.target.closest('[data-act]')) openDetail(row.dataset.symbol);
     const ack = e.target.closest('[data-ack]');
     if (ack) {
@@ -828,14 +1074,9 @@ function init() {
     if (e.target === $('#modal-overlay')) closeModal();
   });
 
-  $('#notify-btn').onclick = async () => {
-    if (!('Notification' in window)) return toast('Notifications not supported in this browser');
-    const perm = await Notification.requestPermission();
-    toast(perm === 'granted' ? 'Browser notifications enabled' : `Notification permission: ${perm}`);
-  };
-
   setInterval(() => {
     $('#clock').textContent = new Date().toLocaleTimeString();
+    renderStamp();
   }, 1000);
 }
 
@@ -846,16 +1087,18 @@ async function main() {
       await indexCache();
       await baseSettings();
     } catch (e) {
-      toast(`Static data not found (${e.message}), run: node server/export.js --out public/data`);
+      toast(`Static data not found, run: node server/export.js --out public/data`);
     }
   }
   init();
   renderBadgeFilters();
+  renderPermStatus();
   await Promise.all([loadSettings(), loadAlerts(), loadSentiment()]);
   await loadScan();
   setInterval(loadScan, 60_000);
   setInterval(loadSentiment, 5 * 60_000);
   setInterval(evaluateAlerts, 30_000);
+  setInterval(flushDigests, 30_000);
 }
 
 main().catch((e) => toast(`Startup error: ${e.message}`));
