@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T19:28:14.798Z",
+  "generatedAt": "2026-11-24T19:54:34.522Z",
   "demo": false,
   "symbols": [
     "AAPL",
@@ -15,6 +15,11 @@
     "ASML",
     "SHEL",
     "ING",
-    "HEINY"
-  ]
+    "KO"
+  ],
+  "pipeline": {
+    "quotes": "stooq live -> cnbc real-time -> latest session close (per-row quote.source)",
+    "history": "yahoo -> nasdaq -> stooq (first success wins, per-file meta.source)",
+    "refreshedBy": "GitHub Actions \"Update Pages market data\", every 5 min on weekdays 13-22 UTC, every 30 min otherwise, and on pushes"
+  }
 }
