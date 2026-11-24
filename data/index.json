@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T14:24:26.663Z",
+  "generatedAt": "2026-11-24T14:34:21.122Z",
   "demo": false,
   "symbols": [
     "AAPL",
@@ -10,12 +10,11 @@
     "META",
     "TSLA",
     "JPM",
-    "ASML.AS",
-    "AD.AS",
-    "INGA.AS",
-    "NN.AS",
-    "SHELL.AS",
-    "HEIA.AS",
-    "VWCE.AS"
+    "AMD",
+    "NFLX",
+    "ASML",
+    "SHEL",
+    "ING",
+    "HEINY"
   ]
 }
