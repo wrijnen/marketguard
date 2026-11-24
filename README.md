@@ -89,11 +89,13 @@ Alert body: `{ "symbol": "AAPL", "type": "below|above|near_stop|stop_breach", "v
 
 The same dashboard runs as a **static site on GitHub Pages**:
 
-- A scheduled workflow (`.github/workflows/update-data.yml`, every 30 min + manual dispatch)
+- A scheduled workflow (`.github/workflows/update-data.yml`: **every 5 minutes on weekdays
+  during market hours** (~13–22 UTC), every 30 min otherwise, plus manual dispatch)
   runs `server/export.js` on GitHub's runners, fetches **real market data**, and commits
   JSON snapshots to the `gh-pages` branch (`data/scan.json`, `data/history/*.json`,
-  `data/sentiment.json`, …). The static frontend recomputes stop-loss levels, badges and
-  the scanner client-side from that data.
+  `data/sentiment.json`, …). The static frontend revalidates `data/index.json` every 60s
+  and hot-reloads when the data commit lands, so the page is near-live (≤ ~6 min stale).
+  The static frontend recomputes stop-loss levels, badges and the scanner client-side from that data.
 - Alerts on the Pages build are stored in your browser (`localStorage`) and evaluated
   client-side against the latest snapshot; browser notifications still work.
 - Enable it once: **Settings → Pages → Build and deployment → Source: "Deploy from a branch" → branch `gh-pages`, folder `/ (root)` → Save.**
@@ -120,6 +122,13 @@ public/          dashboard SPA (vanilla JS + canvas charts, no build step);
 test/            node:test suites (indicators, alerts, export, API smoke via DEMO mode)
 data/            runtime persistence (gitignored)
 ```
+
+## Theme
+
+The UI uses the **Dusk** theme from [Hallmark](https://github.com/Nutlope/hallmark)
+(MIT License, © 2026 Hallmark contributors) — dark slate paper, smoked-glass cards with a
+lit top edge, periwinkle/apricot two-signal palette, Wix Madefor Display/Text type.
+Adapted for a dashboard layout; see `public/styles.css`.
 
 ## Data sources & disclaimer
 
