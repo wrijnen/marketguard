@@ -76,7 +76,7 @@ async function fetchHistoryNasdaq(symbol) {
   } catch {
     /* best effort */
   }
-  return { rows, meta: { name, currency: 'USD', exchange: 'Nasdaq', nasdaqSymbol: sym, forSymbol: symbol !== sym ? symbol : undefined } };
+  return { rows, meta: { name, currency: 'USD', exchange: 'Nasdaq', nasdaqSymbol: sym, forSymbol: symbol !== sym ? symbol : undefined, source: 'nasdaq' } };
 }
 
 const YAHOO_TO_STOOQ = {
@@ -109,6 +109,43 @@ export function guessCurrency(symbol) {
   return 'USD';
 }
 
+const CNBC_HEADERS = { Accept: 'application/json', 'User-Agent': UA['User-Agent'] };
+
+function cnbcSymbol(symbol) {
+  const s = String(symbol).toUpperCase();
+  if (s === '^VIX') return 'VIX';
+  return s;
+}
+
+function parseCnbcTime(t) {
+  if (!t) return null;
+  const norm = String(t).replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  const d = new Date(norm);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+export async function fetchQuoteCnbc(symbol) {
+  const url = `https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=${encodeURIComponent(cnbcSymbol(symbol))}`;
+  const j = JSON.parse(await httpGet(url, 8000, CNBC_HEADERS));
+  const q = j?.FormattedQuoteResult?.FormattedQuote?.[0];
+  if (!q || q.code !== 0 || q.last == null || q.last === 'N/A') throw new Error('cnbc: no quote');
+  const price = parseFloat(String(q.last).replace(/,/g, ''));
+  if (!Number.isFinite(price) || price <= 0) throw new Error('cnbc: bad price');
+  const changePct = q.change_pct != null ? parseFloat(String(q.change_pct).replace('%', '')) : null;
+  return {
+    symbol,
+    price,
+    prevClose: null,
+    changePct,
+    time: parseCnbcTime(q.last_time),
+    asOf: parseCnbcTime(q.last_time),
+    currency: guessCurrency(symbol),
+    name: q.name || symbol,
+    realTime: q.realTime === true || q.realTime === 'true',
+    source: 'cnbc',
+  };
+}
+
 async function fetchHistoryYahoo(symbol, range = '2y') {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`;
   const json = JSON.parse(await httpGet(url));
@@ -138,6 +175,7 @@ async function fetchHistoryYahoo(symbol, range = '2y') {
       name: meta.longName || meta.shortName || symbol,
       currency: meta.currency || guessCurrency(symbol),
       exchange: meta.exchangeName || '',
+      source: 'yahoo',
     },
   };
 }
@@ -162,7 +200,7 @@ async function fetchHistoryStooq(symbol) {
     });
   }
   if (!rows.length) throw new Error('stooq: empty');
-  return { rows, meta: { name: symbol, currency: guessCurrency(symbol), exchange: '' } };
+  return { rows, meta: { name: symbol, currency: guessCurrency(symbol), exchange: '', source: 'stooq' } };
 }
 
 export async function fetchHistory(symbol, range = '2y') {
@@ -195,7 +233,7 @@ export async function fetchHistory(symbol, range = '2y') {
 export async function fetchQuote(symbol) {
   if (DEMO) {
     const h = await fetchHistory(symbol, '5d');
-    return demoQuote(symbol, h.rows, h.meta.currency);
+    return { ...demoQuote(symbol, h.rows, h.meta.currency), source: 'demo', asOf: new Date().toISOString() };
   }
   const key = `q:${symbol}`;
   const hit = cacheGet(key, 20_000);
@@ -213,11 +251,21 @@ export async function fetchQuote(symbol) {
         prevClose: close,
         changePct: 0,
         time: `${parts[1] || ''} ${parts[2] || ''}`.trim(),
+        asOf: new Date().toISOString(),
         currency: guessCurrency(symbol),
+        source: 'stooq',
+        realTime: true,
       };
     }
   } catch {
     q = null;
+  }
+  if (!q) {
+    try {
+      q = await fetchQuoteCnbc(symbol);
+    } catch {
+      q = null;
+    }
   }
   if (!q) {
     const h = await fetchHistory(symbol, '5d');
@@ -231,8 +279,11 @@ export async function fetchQuote(symbol) {
       prevClose: prev ? prev.c : last.c,
       changePct: prev ? ((last.c - prev.c) / prev.c) * 100 : 0,
       time: new Date(last.t).toISOString(),
+      asOf: new Date(last.t).toISOString(),
       currency: h.meta.currency,
       name: h.meta.name,
+      source: `${h.meta.source || 'history'}-close`,
+      realTime: false,
     };
   }
   cacheSet(key, q);

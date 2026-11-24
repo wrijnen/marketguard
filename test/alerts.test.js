@@ -90,6 +90,28 @@ test('ack and remove work and persist to disk', () => {
   assert.equal(reloaded2.state.alerts.length, 0);
 });
 
+test('recovery alert fires when the snapshot shows a recent breach with price back above stop', async () => {
+  const store = tmpStore();
+  store.add({ symbol: 'X', type: 'recovery', schedule: 'daily' });
+  const fired = await store.evaluate(
+    async () => ({ symbol: 'X', price: 110 }),
+    async () => ({ stop: 100, dist: 10, badges: ['recovered'] })
+  );
+  assert.equal(fired.length, 1);
+  assert.match(fired[0].entry.message, /recovered/);
+  assert.equal(store.state.alerts[0].schedule, 'daily');
+});
+
+test('recovery alert does not fire while still below stop', async () => {
+  const store = tmpStore();
+  store.add({ symbol: 'X', type: 'recovery' });
+  const fired = await store.evaluate(
+    async () => ({ symbol: 'X', price: 90 }),
+    async () => ({ stop: 100, dist: -10, badges: [] })
+  );
+  assert.equal(fired.length, 0);
+});
+
 test('inactive alerts are skipped', async () => {
   const store = tmpStore();
   const a = store.add({ symbol: 'X', type: 'below', value: 100 });

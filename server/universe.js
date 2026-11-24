@@ -1,6 +1,7 @@
-// Default watchlist — all available on the Nasdaq API (works from GitHub Actions
-// runners, where Yahoo/Stooq are often rate-limited). ASML/SHEL/ING/HEINY are the
-// US-listed ADRs of the Euronext Amsterdam names, priced in USD.
+// Default watchlist — all verified available on the Nasdaq API and CNBC quotes
+// (both work from GitHub Actions runners, where Yahoo/Stooq are rate-limited).
+// ASML/SHEL/ING are US-listed ADRs of Euronext Amsterdam names, priced in USD.
+// (HEINY was removed: it 404s on the Nasdaq API.)
 export const DEFAULT_UNIVERSE = [
   'AAPL',
   'MSFT',
@@ -15,5 +16,5 @@ export const DEFAULT_UNIVERSE = [
   'ASML',
   'SHEL',
   'ING',
-  'HEINY',
+  'KO',
 ];

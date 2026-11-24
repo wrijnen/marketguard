@@ -31,7 +31,23 @@ export async function runExport(outDir, settings = DEFAULT_EXPORT_SETTINGS) {
   const bySymbol = new Map(scan.map((r) => [r.symbol, r]));
   const merged = rows.map((r) => ({ ...r, snapshot: bySymbol.get(r.symbol)?.snapshot, error: r.error || bySymbol.get(r.symbol)?.error }));
 
-  fs.writeFileSync(path.join(out, 'index.json'), JSON.stringify({ generatedAt, demo: DEMO, symbols: settings.universe }, null, 2));
+  fs.writeFileSync(
+    path.join(out, 'index.json'),
+    JSON.stringify(
+      {
+        generatedAt,
+        demo: DEMO,
+        symbols: settings.universe,
+        pipeline: {
+          quotes: 'stooq live -> cnbc real-time -> latest session close (per-row quote.source)',
+          history: 'yahoo -> nasdaq -> stooq (first success wins, per-file meta.source)',
+          refreshedBy: 'GitHub Actions "Update Pages market data", every 5 min on weekdays 13-22 UTC, every 30 min otherwise, and on pushes',
+        },
+      },
+      null,
+      2
+    )
+  );
   fs.writeFileSync(path.join(out, 'settings.json'), JSON.stringify(settings, null, 2));
   fs.writeFileSync(path.join(out, 'scan.json'), JSON.stringify({ settings, generatedAt, rows: merged }, null, 2));
   try {

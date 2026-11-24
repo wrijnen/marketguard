@@ -2,13 +2,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export const ALERT_TYPES = ['below', 'above', 'near_stop', 'stop_breach'];
+export const ALERT_TYPES = ['below', 'above', 'near_stop', 'stop_breach', 'recovery'];
+export const ALERT_SCHEDULES = ['realtime', 'daily', 'weekly'];
 
 export const ALERT_TYPE_LABELS = {
   below: 'Price drops below',
   above: 'Price rises above',
   near_stop: 'Within X% of stop-loss',
   stop_breach: 'Stop-loss breached',
+  recovery: 'Recovers above stop-loss',
+};
+
+export const ALERT_SCHEDULE_LABELS = {
+  realtime: 'Real-time',
+  daily: 'Daily digest, 17:45',
+  weekly: 'Weekly digest, Friday 16:30',
 };
 
 function fmt(n) {
@@ -38,7 +46,7 @@ export class AlertStore {
     fs.renameSync(tmp, this.file);
   }
 
-  add({ symbol, type, value, note }) {
+  add({ symbol, type, value, note, schedule }) {
     const sym = String(symbol || '').trim().toUpperCase();
     if (!sym) {
       const e = new Error('symbol is required');
@@ -51,7 +59,7 @@ export class AlertStore {
       throw e;
     }
     let val = null;
-    if (type !== 'stop_breach') {
+    if (type !== 'stop_breach' && type !== 'recovery') {
       val = Number(value);
       if (!Number.isFinite(val)) {
         const e = new Error('value must be a number');
@@ -59,12 +67,14 @@ export class AlertStore {
         throw e;
       }
     }
+    const sched = ALERT_SCHEDULES.includes(schedule) ? schedule : 'realtime';
     const alert = {
       id: crypto.randomUUID(),
       symbol: sym,
       type,
       value: val,
       note: String(note || ''),
+      schedule: sched,
       active: true,
       state: 'clear',
       acknowledged: false,
@@ -105,12 +115,15 @@ export class AlertStore {
       } else if (a.type === 'above') {
         cond = q.price >= a.value;
         msg = `${a.symbol} at ${fmt(q.price)} rose above ${fmt(a.value)}`;
-      } else if (a.type === 'stop_breach' || a.type === 'near_stop') {
+      } else if (a.type === 'stop_breach' || a.type === 'near_stop' || a.type === 'recovery') {
         const s = await snapshotOf(a.symbol);
         if (!s || s.stop == null) continue;
         if (a.type === 'stop_breach') {
           cond = q.price <= s.stop;
-          msg = `${a.symbol} stop-loss BREACHED: ${fmt(q.price)} <= stop ${fmt(s.stop)}`;
+          msg = `${a.symbol} stop-loss breached: ${fmt(q.price)} at or below stop ${fmt(s.stop)}`;
+        } else if (a.type === 'recovery') {
+          cond = Array.isArray(s.badges) && s.badges.includes('recovered') && (s.dist ?? 0) > 0;
+          msg = `${a.symbol} recovered above its stop-loss (distance ${s.dist?.toFixed(2)}%, price ${fmt(q.price)})`;
         } else {
           const d = s.dist;
           if (d == null) continue;

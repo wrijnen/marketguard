@@ -5,6 +5,9 @@ A modern, self-hosted dashboard that recreates the core feature set of
 **track real stocks against a trailing stop-loss level, see which names are closest
 to their stop first, and get alerts when levels are approached or breached.**
 
+- **Repo:** https://github.com/wrijnen/marketguard
+- **Live site (GitHub Pages):** https://wrijnen.github.io/marketguard/
+
 > Not affiliated with or endorsed by stoplossalert.nl. Alerts are for **educational
 > purposes only and do not constitute financial advice.**
 
@@ -89,19 +92,29 @@ Alert body: `{ "symbol": "AAPL", "type": "below|above|near_stop|stop_breach", "v
 
 ## 🌐 GitHub Pages (hosted, no server needed)
 
-The same dashboard runs as a **static site on GitHub Pages**:
+The same dashboard runs as a **static site on GitHub Pages** at
+https://wrijnen.github.io/marketguard/ :
 
-- A scheduled workflow (`.github/workflows/update-data.yml`: **every 5 minutes on weekdays
-  during market hours** (~13–22 UTC), every 30 min otherwise, plus manual dispatch)
-  runs `server/export.js` on GitHub's runners, fetches **real market data**, and commits
-  JSON snapshots to the `gh-pages` branch (`data/scan.json`, `data/history/*.json`,
-  `data/sentiment.json`, …). The static frontend revalidates `data/index.json` every 60s
-  and hot-reloads when the data commit lands, so the page is near-live (≤ ~6 min stale).
-  The static frontend recomputes stop-loss levels, badges and the scanner client-side from that data.
+- **Active refresh mechanism: a scheduled GitHub Action.** `.github/workflows/update-data.yml`
+  runs **every 5 minutes on weekdays 13–22 UTC** (≈ 09:00–17:00 ET / 15:00–23:00 CET), every 30 min
+  otherwise, on every push to the default branch, and on manual dispatch. It runs
+  `server/export.js` on GitHub's runners and commits JSON snapshots to the `gh-pages` branch
+  (`data/scan.json`, `data/history/*.json`, `data/sentiment.json`, …).
+  (Direct client-side fetching from the browser — Yahoo → Stooq — is **not** used: those APIs
+  send no CORS headers, so a browser cannot call them. The Action is the live path.)
+- The page revalidates `data/index.json` every 60 s and hot-reloads when a data commit lands,
+  so the screen is at most ~6 minutes behind the workflow during market hours. The header
+  shows a visible **"updated hh:mm, N min ago · source"** stamp and a **stale-data warning**
+  when the snapshot is older than 15 minutes.
+- Quotes carry their own timestamp and source (`cnbc` real-time where available, else the
+  latest session close via `nasdaq`), so any number on screen can be compared against a live
+  quote within the stated delay. Per-row "as of" times are shown in the tables/cards.
+- The static frontend recomputes stop-loss levels, badges and the scanner client-side from the
+  history files.
 - Alerts on the Pages build are stored in your browser (`localStorage`) and evaluated
-  client-side against the latest snapshot; browser notifications still work.
-- Enable it once: **Settings → Pages → Build and deployment → Source: "Deploy from a branch" → branch `gh-pages`, folder `/ (root)` → Save.**
-  The site is then served at `https://<you>.github.io/marketguard/`.
+  client-side every 30 s **while the page is open**; browser notifications and digests
+  (daily 17:45, weekly Friday 16:30) are delivered in-app. Email delivery is not configured.
+- Enable Pages once: **Settings → Pages → Build and deployment → Source: "Deploy from a branch" → branch `gh-pages`, folder `/ (root)` → Save.**
 - The workflow needs **Settings → Actions → General → Workflow permissions → "Read and write permissions"** so it can push data commits to `gh-pages`.
 - Scheduled runs execute on the repo's default branch. Trigger a manual refresh anytime from the **Actions** tab ("Update Pages market data" → "Run workflow").
 - To regenerate the data locally: `node server/export.js --out public/data` (add `DEMO=1` for synthetic data without network).
@@ -111,29 +124,36 @@ The same dashboard runs as a **static site on GitHub Pages**:
 ```
 server/
   index.js       zero-dependency HTTP server + routes (binds 127.0.0.1 by default)
-  data.js        market data layer: Yahoo Finance → Nasdaq API → Stooq fallback, caching, scan, sentiment
+  data.js        market data layer: quotes stooq -> cnbc -> latest close; history yahoo -> nasdaq -> stooq
   export.js      exports static JSON data (data/*.json) for the GitHub Pages build
   indicators.js  re-exports the shared math module
   alerts.js      persistent alert store + evaluation state machine (server mode)
   demo.js        seeded synthetic data for offline demo mode
-  universe.js    default watchlist (US + Euronext Amsterdam)
+  universe.js    default watchlist (tickers verified on the Nasdaq API + CNBC quotes)
 public/          dashboard SPA (vanilla JS + canvas charts, no build step);
                  runs against the local API (npm start) or as a static Pages site
                  (public/indicators.js is the shared math module used by both)
 .github/workflows/update-data.yml  scheduled market-data refresh for gh-pages
-test/            node:test suites (indicators, alerts, export, API smoke via DEMO mode)
+test/            node:test suites (indicators, alerts incl. recovery type, export, API smoke via DEMO mode)
 data/            runtime persistence (gitignored)
 ```
 
-## Theme
+## Design
 
-The UI uses the **Dusk** theme from [Hallmark](https://github.com/Nutlope/hallmark)
-(MIT License, © 2026 Hallmark contributors) — dark slate paper, smoked-glass cards with a
-lit top edge, periwinkle/apricot two-signal palette, Wix Madefor Display/Text type.
-Adapted for a dashboard layout; see `public/styles.css`.
+Custom modern dashboard theme (`public/styles.css`): dark neutral surfaces, Inter for UI
+text and Space Grotesk for display/figures, and a semantic status colour system —
+green `safe`, amber `near`, red `breach` (breached rows are highlighted, never dimmed).
+Positions render as cards with a sparkline that draws the stop-loss level as a dashed line;
+the scanner is a roomy table with a rescaled 0–30% distance bar and a tick at the alert
+threshold; note tags are capped at three per row with a "+N" overflow. Layout is responsive
+down to phones. Earlier iterations used Hallmark (Nutlope) themes; the current look is
+custom per request.
 
 ## Data sources & disclaimer
 
-Market data: Yahoo Finance chart API, Nasdaq API and Stooq (unofficial, free, no key; may be
-delayed). Theme: Dusk from Hallmark (MIT). Sentiment: CNN Fear & Greed Index public endpoint. This tool provides
-alerts for educational purposes only and does not constitute financial advice.
+Quotes: Stooq live → CNBC real-time → latest session close (Nasdaq/Yahoo history), each quote
+tagged with its source and timestamp. History: Yahoo Finance → Nasdaq API → Stooq, first
+success wins (per-file `meta.source`). Sentiment: CNN Fear & Greed Index public endpoint.
+All unofficial, free, no API key; figures may be delayed — the header stamp states exactly
+when the snapshot was taken and from which source. This tool provides alerts for
+**educational purposes only and does not constitute financial advice**.
