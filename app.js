@@ -1,4 +1,14 @@
-import { BADGES, computeSnapshot, dataFileName, sliceRange } from './indicators.js';
+const BADGES = [
+  { key: 'trend20', label: '🚀 3M Uptrend >20%' },
+  { key: 'trend10', label: '📈 3M Uptrend >10%' },
+  { key: 'nearTop', label: '🎯 Within 10% of Top' },
+  { key: 'aboveMA50', label: '📊 >MA50' },
+  { key: 'aboveMA200', label: '📉 >MA200' },
+  { key: 'goldenCross', label: '✨ Golden Cross' },
+  { key: 'lowVol', label: '🍃 Low Vol <30%' },
+  { key: 'safeBuffer', label: '🛡️ Safe Buffer >10%' },
+  { key: 'recovered', label: '💪 Recovered' },
+];
 
 const STATUS_META = {
   safe: { label: 'Safe', cls: 'status-safe' },
@@ -10,12 +20,7 @@ const STATUS_META = {
 
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£', GBp: 'p', CHF: 'CHF ', CAD: 'C$', SEK: 'kr', DKK: 'kr' };
 
-const LS_SETTINGS = 'sla_settings_overrides';
-const LS_ALERTS = 'sla_alerts';
-const LS_LOG = 'sla_alerts_log';
-
 const state = {
-  mode: 'server',
   settings: null,
   scan: [],
   alerts: [],
@@ -24,11 +29,10 @@ const state = {
   filters: new Set(),
   detail: null,
   detailRange: '1y',
+  detailRows: null,
+  alertSymbol: '',
   notified: new Set(),
   demo: false,
-  histCache: new Map(),
-  indexCache: null,
-  baseSettingsCache: null,
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -38,222 +42,11 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function loadLS(key, dflt) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? dflt;
-  } catch {
-    return dflt;
-  }
-}
-function saveLS(key, val) {
-  localStorage.setItem(key, JSON.stringify(val));
-}
-
-async function detectMode() {
-  try {
-    const r = await fetch('api/health', { signal: AbortSignal.timeout(2500) });
-    if (r.ok) return 'server';
-  } catch {
-    /* fall through to static */
-  }
-  return 'static';
-}
-
-async function fetchJson(url) {
-  const r = await fetch(url, { cache: 'no-cache' });
-  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
-  return r.json();
-}
-
-async function indexCache() {
-  if (!state.indexCache) state.indexCache = await fetchJson('data/index.json');
-  return state.indexCache;
-}
-
-async function baseSettings() {
-  if (!state.baseSettingsCache) state.baseSettingsCache = await fetchJson('data/settings.json');
-  return state.baseSettingsCache;
-}
-
-function mergedSettings() {
-  return { ...(state.baseSettingsCache || {}), ...loadLS(LS_SETTINGS, {}) };
-}
-
-async function historyOf(sym) {
-  if (!state.histCache.has(sym)) {
-    state.histCache.set(sym, await fetchJson(`data/history/${dataFileName(sym)}.json`));
-  }
-  return state.histCache.get(sym);
-}
-
-async function staticScan() {
-  const idx = await indexCache();
-  const settings = mergedSettings();
-  const rows = [];
-  await Promise.all(
-    idx.symbols.map(async (sym) => {
-      try {
-        const hj = await historyOf(sym);
-        const snap = computeSnapshot(hj.rows, { ...settings, symbol: sym });
-        if (!snap) throw new Error('empty history');
-        const closes = hj.rows.map((r) => r.c);
-        const last = closes[closes.length - 1];
-        const prev = closes[closes.length - 2];
-        rows.push({
-          symbol: sym,
-          meta: hj.meta,
-          quote: {
-            symbol: sym,
-            price: last,
-            prevClose: prev ?? last,
-            changePct: prev ? ((last - prev) / prev) * 100 : 0,
-            time: new Date(hj.rows[hj.rows.length - 1].t).toISOString(),
-            currency: hj.meta?.currency,
-            name: hj.meta?.name,
-          },
-          snapshot: { ...snap, spark: closes.slice(-60) },
-        });
-      } catch (e) {
-        rows.push({ symbol: sym, error: e.message });
-      }
-    })
-  );
-  rows.sort((a, b) => {
-    const da = a.snapshot?.dist;
-    const db = b.snapshot?.dist;
-    if (da == null && db == null) return 0;
-    if (da == null) return 1;
-    if (db == null) return -1;
-    return da - db;
-  });
-  return { settings, generatedAt: idx.generatedAt, rows };
-}
-
-function staticAlertAdd(body) {
-  const sym = String(body.symbol || '').trim().toUpperCase();
-  if (!sym) throw new Error('symbol is required');
-  if (!['below', 'above', 'near_stop', 'stop_breach'].includes(body.type)) throw new Error('invalid type');
-  let val = null;
-  if (body.type !== 'stop_breach') {
-    val = Number(body.value);
-    if (!Number.isFinite(val)) throw new Error('value must be a number');
-  }
-  const alert = {
-    id: crypto.randomUUID(),
-    symbol: sym,
-    type: body.type,
-    value: val,
-    note: String(body.note || ''),
-    active: true,
-    state: 'clear',
-    acknowledged: false,
-    createdAt: new Date().toISOString(),
-    triggeredAt: null,
-  };
-  const list = loadLS(LS_ALERTS, []);
-  list.unshift(alert);
-  saveLS(LS_ALERTS, list);
-  return alert;
-}
-
-async function staticEvaluate() {
-  const scan = await staticScan();
-  const bySym = new Map(scan.rows.filter((r) => r.snapshot).map((r) => [r.symbol, r]));
-  const alerts = loadLS(LS_ALERTS, []);
-  const log = loadLS(LS_LOG, []);
-  const fired = [];
-  let changed = false;
-  for (const a of alerts) {
-    if (!a.active) continue;
-    const row = bySym.get(a.symbol);
-    const price = row?.quote?.price;
-    if (price == null) continue;
-    const s = row.snapshot;
-    let cond = false;
-    let msg = '';
-    if (a.type === 'below') {
-      cond = price <= a.value;
-      msg = `${a.symbol} at ${price} dropped below ${a.value}`;
-    } else if (a.type === 'above') {
-      cond = price >= a.value;
-      msg = `${a.symbol} at ${price} rose above ${a.value}`;
-    } else if (a.type === 'stop_breach') {
-      cond = s.stop != null && price <= s.stop;
-      msg = `${a.symbol} stop-loss BREACHED: ${price} <= stop ${s.stop}`;
-    } else if (a.type === 'near_stop') {
-      cond = s.dist != null && s.dist <= a.value;
-      msg = `${a.symbol} within ${a.value}% of stop-loss (distance ${s.dist?.toFixed(2)}%, stop ${s.stop})`;
-    }
-    if (cond && a.state !== 'triggered') {
-      a.state = 'triggered';
-      a.triggeredAt = new Date().toISOString();
-      a.acknowledged = false;
-      changed = true;
-      const entry = { id: crypto.randomUUID(), alertId: a.id, symbol: a.symbol, type: a.type, message: msg, price, ts: new Date().toISOString() };
-      log.unshift(entry);
-      if (log.length > 200) log.length = 200;
-      fired.push({ alert: a, entry });
-    } else if (!cond && a.state === 'triggered') {
-      a.state = 'clear';
-      a.triggeredAt = null;
-      changed = true;
-    }
-  }
-  if (changed || fired.length) {
-    saveLS(LS_ALERTS, alerts);
-    saveLS(LS_LOG, log);
-  }
-  return fired;
-}
-
-async function staticApi(path, opts = {}) {
-  const method = (opts.method || 'GET').toUpperCase();
-  const body = opts.body ? JSON.parse(opts.body) : {};
-  if (path === 'api/health') return { ok: true, demo: (await indexCache()).demo, static: true, time: new Date().toISOString() };
-  if (path === 'api/settings' && method === 'GET') return mergedSettings();
-  if (path === 'api/settings' && method === 'PUT') {
-    saveLS(LS_SETTINGS, { ...loadLS(LS_SETTINGS, {}), ...body });
-    return mergedSettings();
-  }
-  if (path === 'api/scan' && method === 'GET') return staticScan();
-  const h = path.match(/^api\/history\/([^?]+)/);
-  if (h && method === 'GET') {
-    const sym = decodeURIComponent(h[1]);
-    const range = new URLSearchParams(path.split('?')[1] || '').get('range') || '1y';
-    const hj = await historyOf(sym);
-    return { symbol: sym, meta: hj.meta, range, rows: sliceRange(hj.rows, range) };
-  }
-  if (path === 'api/sentiment' && method === 'GET') return fetchJson('data/sentiment.json');
-  const q = path.match(/^api\/quote\?symbols=(.*)$/);
-  if (q && method === 'GET') {
-    const scan = await staticScan();
-    const wanted = decodeURIComponent(q[1]).split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
-    return { quotes: wanted.map((s) => scan.rows.find((r) => r.symbol === s)?.quote || { symbol: s, error: 'not in universe' }) };
-  }
-  if (path === 'api/alerts' && method === 'GET') return { alerts: loadLS(LS_ALERTS, []), log: loadLS(LS_LOG, []) };
-  if (path === 'api/alerts' && method === 'POST') return staticAlertAdd(body);
-  if (path === 'api/evaluate' && method === 'POST') return { fired: await staticEvaluate() };
-  const ack = path.match(/^api\/alerts\/([^/]+)\/ack$/);
-  if (ack && method === 'POST') {
-    const list = loadLS(LS_ALERTS, []);
-    const a = list.find((x) => x.id === ack[1]);
-    if (a) {
-      a.acknowledged = true;
-      saveLS(LS_ALERTS, list);
-    }
-    return { alert: a || null };
-  }
-  const del = path.match(/^api\/alerts\/([^/]+)$/);
-  if (del && method === 'DELETE') {
-    saveLS(LS_ALERTS, loadLS(LS_ALERTS, []).filter((x) => x.id !== del[1]));
-    return { ok: true };
-  }
-  throw new Error(`not found: ${path}`);
-}
-
 async function api(path, opts = {}) {
-  if (state.mode === 'static') return staticApi(path, opts);
-  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
   return body;
@@ -262,7 +55,8 @@ async function api(path, opts = {}) {
 function fmtPrice(n, currency) {
   if (n == null || !Number.isFinite(n)) return '—';
   const sym = CURRENCY_SYMBOL[currency] || '';
-  return `${sym}${Number(n).toFixed(2)}`;
+  const digits = currency === 'GBp' ? 2 : Math.abs(n) < 100 ? 2 : 2;
+  return `${sym}${Number(n).toFixed(digits)}`;
 }
 
 function fmtPct(n, digits = 1) {
@@ -272,7 +66,8 @@ function fmtPct(n, digits = 1) {
 
 function fmtTime(ts) {
   if (!ts) return '';
-  return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(ts);
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function toast(message) {
@@ -286,7 +81,7 @@ function toast(message) {
 
 function notifyBrowser(title, body) {
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, { body });
+    new Notification(title, { body, icon: '/favicon.svg' });
   }
 }
 
@@ -340,9 +135,8 @@ function drawDetailChart(canvas, rows, snapshot) {
   const iw = w - padL - padR;
   const ih = h - padT - padB;
   const closes = rows.map((r) => r.c);
-  const off = rows.length - (snapshot?.ma50series?.length || rows.length);
-  const ma50 = rows.map((r, i) => snapshot?.ma50series?.[i + off] ?? null);
-  const ma200 = rows.map((r, i) => snapshot?.ma200series?.[i + off] ?? null);
+  const ma50 = rows.map((r, i) => (snapshot?.ma50series?.[i + (rows.length - snapshot.ma50series.length)] ?? null));
+  const ma200 = rows.map((r, i) => (snapshot?.ma200series?.[i + (rows.length - snapshot.ma200series.length)] ?? null));
   const allVals = [...closes];
   if (snapshot?.stop != null) allVals.push(snapshot.stop);
   const min = Math.min(...allVals, ...rows.map((r) => r.l));
@@ -364,8 +158,10 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.stroke();
     ctx.fillText(fmtPrice(v), 4, y + 3);
   }
-  ctx.fillText(fmtTime(rows[0].t), padL, h - 6);
-  const lastLabel = fmtTime(rows[rows.length - 1].t);
+  const firstT = rows[0].t;
+  const lastT = rows[rows.length - 1].t;
+  ctx.fillText(fmtTime(firstT), padL, h - 6);
+  const lastLabel = fmtTime(lastT);
   ctx.fillText(lastLabel, w - padR - ctx.measureText(lastLabel).width, h - 6);
 
   const line = (series, color, width, dash) => {
@@ -415,8 +211,9 @@ function drawDetailChart(canvas, rows, snapshot) {
 
   line(closes, '#818cf8', 2);
 
+  const last = closes[closes.length - 1];
   ctx.beginPath();
-  ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3.5, 0, Math.PI * 2);
+  ctx.arc(px(rows.length - 1), py(last), 3.5, 0, Math.PI * 2);
   ctx.fillStyle = '#a5b4fc';
   ctx.fill();
 }
@@ -505,7 +302,7 @@ function renderScanner() {
     return true;
   });
   const within = state.scan.filter((r) => r.snapshot && r.snapshot.dist != null && r.snapshot.dist <= t).length;
-  $('#scan-summary').textContent = `${within} of ${state.scan.filter((r) => r.snapshot).length} stocks within ${t}% of their stop-loss — sorted closest first.${state.mode === 'static' ? ' (static snapshot)' : ''}`;
+  $('#scan-summary').textContent = `${within} of ${state.scan.filter((r) => r.snapshot).length} stocks within ${t}% of their stop-loss — sorted closest first.`;
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty">No matching stocks.</div></td></tr>';
     return;
@@ -555,7 +352,7 @@ function renderAlerts() {
             <span class="title">${esc(a.symbol)} — ${esc(label)}</span>
             <span class="status-chip ${a.state === 'triggered' ? 'status-breached' : 'status-safe'}">${a.state === 'triggered' ? 'TRIGGERED' : 'active'}</span>
           </div>
-          <div class="meta">created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? ` · fired ${esc(fmtTime(a.triggeredAt))}` : ''}${state.mode === 'static' ? ' · stored locally' : ''}</div>
+          <div class="meta">created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? ` · fired ${esc(fmtTime(a.triggeredAt))}` : ''}</div>
           ${a.note ? `<div class="note">${esc(a.note)}</div>` : ''}
           <div class="actions">
             ${a.state === 'triggered' && !a.acknowledged ? `<button class="btn small" data-ack="${esc(a.id)}">Acknowledge</button>` : ''}
@@ -610,9 +407,10 @@ async function openDetail(symbol) {
   overlay.classList.remove('hidden');
   modal.innerHTML = '<div class="empty">Loading chart…</div>';
   try {
-    const h = await api(`api/history/${encodeURIComponent(symbol)}?range=${state.detailRange}`);
-    const scan = await api('api/scan');
+    const h = await api(`/api/history/${encodeURIComponent(symbol)}?range=${state.detailRange}`);
+    const scan = await api('/api/scan');
     const row = scan.rows.find((r) => r.symbol === symbol);
+    state.detailRows = h.rows;
     renderDetailModal(symbol, h, row?.snapshot);
   } catch (e) {
     modal.innerHTML = `<div class="empty">${esc(e.message)}</div><div class="modal-actions"><button class="btn" id="modal-close2">Close</button></div>`;
@@ -654,11 +452,12 @@ function renderDetailModal(symbol, h, snapshot) {
   $$('#modal .range-btns .btn').forEach((b) => {
     b.onclick = async () => {
       state.detailRange = b.dataset.range;
-      const h2 = await api(`api/history/${encodeURIComponent(symbol)}?range=${state.detailRange}`);
+      const h2 = await api(`/api/history/${encodeURIComponent(symbol)}?range=${state.detailRange}`);
+      state.detailRows = h2.rows;
       renderDetailModal(symbol, h2, s);
     };
   });
-  drawDetailChart($('#detail-chart'), h.rows, s);
+  drawDetailChart($('#detail-chart'), state.detailRows, s);
 }
 
 function closeModal() {
@@ -667,6 +466,7 @@ function closeModal() {
 }
 
 function openAlertModal(symbol = '') {
+  state.alertSymbol = symbol;
   const overlay = $('#modal-overlay');
   const modal = $('#modal');
   overlay.classList.remove('hidden');
@@ -676,7 +476,7 @@ function openAlertModal(symbol = '') {
   modal.innerHTML = `
     <button class="btn small ghost modal-close" id="modal-close">✕</button>
     <h3>New alert</h3>
-    <div class="sub">${state.mode === 'static' ? 'Stored in your browser (localStorage) and evaluated locally on this static snapshot.' : 'Evaluated server-side every 60s. You get an in-app toast and a browser notification when it fires.'}</div>
+    <div class="sub">Evaluated server-side every 60s. You get an in-app toast and a browser notification when it fires.</div>
     <div class="form-grid">
       <label>Symbol
         <input id="f-symbol" list="universe-list" value="${esc(symbol)}" placeholder="AAPL" />
@@ -712,7 +512,7 @@ function openAlertModal(symbol = '') {
     const value = $('#f-value').value;
     const note = $('#f-note').value;
     try {
-      await api('api/alerts', { method: 'POST', body: JSON.stringify({ symbol: symbol2, type, value, note }) });
+      await api('/api/alerts', { method: 'POST', body: JSON.stringify({ symbol: symbol2, type, value, note }) });
       toast(`Alert created for ${symbol2}`);
       closeModal();
       await loadAlerts();
@@ -723,15 +523,15 @@ function openAlertModal(symbol = '') {
 }
 
 async function loadSettings() {
-  state.settings = await api('api/settings');
+  state.settings = await api('/api/settings');
   renderSettingsInputs();
 }
 
 async function loadScan() {
-  const data = await api('api/scan');
+  const data = await api('/api/scan');
   state.settings = data.settings;
   state.scan = data.rows;
-  const health = await api('api/health').catch(() => ({}));
+  const health = await api('/api/health').catch(() => ({}));
   state.demo = !!health.demo;
   $('#demo-badge').classList.toggle('hidden', !state.demo);
   renderStats();
@@ -741,7 +541,7 @@ async function loadScan() {
 }
 
 async function loadAlerts() {
-  const data = await api('api/alerts');
+  const data = await api('/api/alerts');
   state.alerts = data.alerts;
   state.log = data.log;
   renderAlerts();
@@ -749,7 +549,7 @@ async function loadAlerts() {
 
 async function loadSentiment() {
   try {
-    state.sentiment = await api('api/sentiment');
+    state.sentiment = await api('/api/sentiment');
     renderSentiment();
   } catch {
     /* optional */
@@ -758,7 +558,7 @@ async function loadSentiment() {
 
 async function evaluateAlerts() {
   try {
-    const { fired } = await api('api/evaluate', { method: 'POST', body: '{}' });
+    const { fired } = await api('/api/evaluate', { method: 'POST', body: '{}' });
     for (const f of fired || []) {
       if (state.notified.has(f.entry.id)) continue;
       state.notified.add(f.entry.id);
@@ -769,6 +569,10 @@ async function evaluateAlerts() {
   } catch {
     /* server may be restarting */
   }
+}
+
+function currentView() {
+  return $('.tab.active')?.dataset.view || 'dashboard';
 }
 
 function init() {
@@ -784,7 +588,7 @@ function init() {
     const sym = $('#add-symbol-input').value.trim().toUpperCase();
     if (!sym) return;
     const universe = [...(state.settings?.universe || []), sym].filter((v, i, a) => a.indexOf(v) === i);
-    await api('api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
+    await api('/api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
     $('#add-symbol-input').value = '';
     toast(`Added ${sym}`);
     await loadScan();
@@ -797,7 +601,7 @@ function init() {
       atrMult: Number($('#set-atrMult').value),
       threshold: Number($('#set-threshold').value),
     };
-    await api('api/settings', { method: 'PUT', body: JSON.stringify(body) });
+    await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) });
     toast('Settings applied');
     await loadScan();
   };
@@ -824,7 +628,7 @@ function init() {
       if (kind === 'alert') return openAlertModal(symbol);
       if (kind === 'remove') {
         const universe = (state.settings?.universe || []).filter((s) => s !== symbol);
-        await api('api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify({ universe }) });
         toast(`Removed ${symbol}`);
         return loadScan();
       }
@@ -833,12 +637,12 @@ function init() {
     if (row && !e.target.closest('[data-act]')) openDetail(row.dataset.symbol);
     const ack = e.target.closest('[data-ack]');
     if (ack) {
-      await api(`api/alerts/${ack.dataset.ack}/ack`, { method: 'POST', body: '{}' });
+      await api(`/api/alerts/${ack.dataset.ack}/ack`, { method: 'POST', body: '{}' });
       return loadAlerts();
     }
     const del = e.target.closest('[data-del]');
     if (del) {
-      await api(`api/alerts/${del.dataset.del}`, { method: 'DELETE' });
+      await api(`/api/alerts/${del.dataset.del}`, { method: 'DELETE' });
       toast('Alert deleted');
       return loadAlerts();
     }
@@ -860,15 +664,6 @@ function init() {
 }
 
 async function main() {
-  state.mode = await detectMode();
-  if (state.mode === 'static') {
-    try {
-      await indexCache();
-      await baseSettings();
-    } catch (e) {
-      toast(`Static data not found (${e.message}) — run: node server/export.js --out public/data`);
-    }
-  }
   init();
   renderBadgeFilters();
   await Promise.all([loadSettings(), loadAlerts(), loadSentiment()]);
