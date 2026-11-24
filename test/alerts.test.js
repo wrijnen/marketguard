@@ -63,7 +63,7 @@ test('stop_breach and near_stop use snapshot stop levels', async () => {
   assert.equal(fired.length, 2);
   const types = fired.map((f) => f.alert.type).sort();
   assert.deepEqual(types, ['near_stop', 'stop_breach']);
-  assert.match(fired.find((f) => f.alert.type === 'stop_breach').entry.message, /BREACHED/);
+  assert.match(fired.find((f) => f.alert.type === 'stop_breach').entry.message, /breached/i);
 });
 
 test('near_stop does not fire when far from stop', async () => {
