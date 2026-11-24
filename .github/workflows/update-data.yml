@@ -5,6 +5,8 @@ on:
     - cron: '*/5 13-22 * * 1-5'   # every 5 min on weekdays ~09:00-17:00 ET / 15:00-23:00 CET (UTC hours 13-22)
     - cron: '*/30 * * * *'        # every 30 min otherwise
   workflow_dispatch:
+  push:
+    branches: [vibe/stoploss-dashboard-fef2f6]   # refresh data on code pushes too
 
 permissions:
   contents: write
