@@ -136,7 +136,7 @@ test('static index is served', async () => {
   const res = await fetch(`${BASE}/`);
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.match(html, /StopLoss Alert/);
+  assert.match(html, /Stoploss Alert/i);
 });
 
 test('unknown api route returns 404 json', async () => {

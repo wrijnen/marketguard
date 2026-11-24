@@ -5,7 +5,7 @@ const STATUS_META = {
   watch: { label: 'Watch', cls: 'status-watch' },
   near: { label: 'Near stop', cls: 'status-near' },
   breached: { label: 'Breached', cls: 'status-breached' },
-  unknown: { label: 'N/A', cls: 'status-unknown' },
+  unknown: { label: 'n/a', cls: 'status-unknown' },
 };
 
 const CURRENCY_SYMBOL = { USD: '$', EUR: '€', GBP: '£', GBp: 'p', CHF: 'CHF ', CAD: 'C$', SEK: 'kr', DKK: 'kr' };
@@ -180,10 +180,10 @@ async function staticEvaluate() {
       msg = `${a.symbol} at ${price} rose above ${a.value}`;
     } else if (a.type === 'stop_breach') {
       cond = s.stop != null && price <= s.stop;
-      msg = `${a.symbol} stop-loss BREACHED: ${price} <= stop ${s.stop}`;
+      msg = `${a.symbol} stop-loss breached, ${price} at or below stop ${s.stop}`;
     } else if (a.type === 'near_stop') {
       cond = s.dist != null && s.dist <= a.value;
-      msg = `${a.symbol} within ${a.value}% of stop-loss (distance ${s.dist?.toFixed(2)}%, stop ${s.stop})`;
+      msg = `${a.symbol} within ${a.value}% of stop-loss, distance ${s.dist?.toFixed(2)}% against stop ${s.stop}`;
     }
     if (cond && a.state !== 'triggered') {
       a.state = 'triggered';
@@ -261,13 +261,13 @@ async function api(path, opts = {}) {
 }
 
 function fmtPrice(n, currency) {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return 'n/a';
   const sym = CURRENCY_SYMBOL[currency] || '';
   return `${sym}${Number(n).toFixed(2)}`;
 }
 
 function fmtPct(n, digits = 1) {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return 'n/a';
   return `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`;
 }
 
@@ -293,16 +293,16 @@ function notifyBrowser(title, body) {
 
 function statusColor(dist) {
   if (dist == null) return 'var(--color-muted)';
-  if (dist <= 0) return 'var(--color-dusk)';
+  if (dist <= 0) return 'var(--color-accent)';
   if (dist <= (state.settings?.threshold ?? 5)) return 'var(--color-accent-2)';
   if (dist <= 10) return 'var(--color-muted)';
-  return 'var(--color-accent-hi)';
+  return 'var(--color-ink)';
 }
 
 function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || canvas.parentElement.clientWidth;
-  const h = canvas.clientHeight || 56;
+  const h = canvas.clientHeight || 26;
   canvas.width = w * dpr;
   canvas.height = h * dpr;
   const ctx = canvas.getContext('2d');
@@ -317,27 +317,20 @@ function drawSparkline(canvas, values) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-  const px = (i) => (i / (values.length - 1)) * (w - 6) + 3;
-  const py = (v) => h - 4 - ((v - min) / span) * (h - 8);
-  const up = values[values.length - 1] >= values[0];
-  const color = up ? 'var(--color-accent-hi)' : 'var(--color-accent-2)';
+  const px = (i) => (i / (values.length - 1)) * (w - 2) + 1;
+  const py = (v) => h - 2 - ((v - min) / span) * (h - 4);
   ctx.beginPath();
   values.forEach((v, i) => (i ? ctx.lineTo(px(i), py(v)) : ctx.moveTo(px(i), py(v))));
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = 'var(--color-ink)';
+  ctx.lineWidth = 1.2;
   ctx.lineJoin = 'round';
   ctx.stroke();
-  ctx.lineTo(px(values.length - 1), h);
-  ctx.lineTo(px(0), h);
-  ctx.closePath();
-  ctx.fillStyle = up ? 'oklch(84% 0.085 274 / 0.12)' : 'oklch(83% 0.095 62 / 0.12)';
-  ctx.fill();
 }
 
 function drawDetailChart(canvas, rows, snapshot) {
   const { ctx, w, h } = setupCanvas(canvas);
   if (!rows || rows.length < 2) return;
-  const padL = 56, padR = 12, padT = 12, padB = 22;
+  const padL = 52, padR = 12, padT = 12, padB = 22;
   const iw = w - padL - padR;
   const ih = h - padT - padB;
   const closes = rows.map((r) => r.c);
@@ -352,9 +345,9 @@ function drawDetailChart(canvas, rows, snapshot) {
   const px = (i) => padL + (i / (rows.length - 1)) * iw;
   const py = (v) => padT + ih - ((v - min) / span) * ih;
 
-  ctx.strokeStyle = 'oklch(100% 0 0 / 0.06)';
+  ctx.strokeStyle = 'var(--color-rule)';
   ctx.fillStyle = 'var(--color-muted)';
-  ctx.font = '10px "Wix Madefor Text", system-ui, sans-serif';
+  ctx.font = '10px "IBM Plex Mono", ui-monospace, monospace';
   ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
     const v = min + (span * g) / 4;
@@ -363,7 +356,7 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.moveTo(padL, y);
     ctx.lineTo(w - padR, y);
     ctx.stroke();
-    ctx.fillText(fmtPrice(v), 4, y + 3);
+    ctx.fillText(fmtPrice(v), 2, y + 3);
   }
   ctx.fillText(fmtTime(rows[0].t), padL, h - 6);
   const lastLabel = fmtTime(rows[rows.length - 1].t);
@@ -386,15 +379,15 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.setLineDash([]);
   };
 
-  line(ma200, 'oklch(100% 0 0 / 0.4)', 1.2);
-  line(ma50, 'var(--color-accent-2)', 1.2);
+  line(ma200, 'var(--color-muted)', 1, [3, 3]);
+  line(ma50, 'var(--color-ink-2)', 1, [3, 3]);
 
   if (snapshot?.stop != null) {
     ctx.beginPath();
     ctx.moveTo(padL, py(snapshot.stop));
     ctx.lineTo(w - padR, py(snapshot.stop));
-    ctx.strokeStyle = 'var(--color-accent-2)';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'var(--color-rule-2)';
+    ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -402,28 +395,16 @@ function drawDetailChart(canvas, rows, snapshot) {
     ctx.fillText(`stop ${fmtPrice(snapshot.stop)}`, padL + 6, py(snapshot.stop) - 5);
   }
 
-  const grad = ctx.createLinearGradient(0, padT, 0, padT + ih);
-  grad.addColorStop(0, 'oklch(77% 0.10 274 / 0.30)');
-  grad.addColorStop(1, 'oklch(77% 0.10 274 / 0)');
-  ctx.beginPath();
-  ctx.moveTo(px(0), py(closes[0]));
-  closes.forEach((v, i) => ctx.lineTo(px(i), py(v)));
-  ctx.lineTo(px(rows.length - 1), padT + ih);
-  ctx.lineTo(px(0), padT + ih);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  line(closes, 'var(--color-accent-hi)', 2);
+  line(closes, 'var(--color-accent)', 2);
 
   ctx.beginPath();
-  ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3.5, 0, Math.PI * 2);
-  ctx.fillStyle = 'var(--color-accent-hi)';
+  ctx.arc(px(rows.length - 1), py(closes[closes.length - 1]), 3, 0, Math.PI * 2);
+  ctx.fillStyle = 'var(--color-accent)';
   ctx.fill();
 }
 
 function badgeHtml(badges) {
-  if (!badges?.length) return '<span class="muted">—</span>';
+  if (!badges?.length) return '<span class="muted">n/a</span>';
   return badges
     .map((k) => {
       const b = BADGES.find((x) => x.key === k);
@@ -432,11 +413,47 @@ function badgeHtml(badges) {
     .join('');
 }
 
-function distBarHtml(dist) {
-  if (dist == null) return '<span class="muted">—</span>';
+function distCellHtml(dist) {
+  if (dist == null) return '<span class="muted">n/a</span>';
   const pct = Math.max(0, Math.min(100, (Math.min(dist, 30) / 30) * 100));
-  return `<div class="dist-bar"><div style="width:${pct}%;background:${statusColor(dist)}"></div></div>
-    <span class="num" style="color:${statusColor(dist)};font-weight:700">${fmtPct(dist)}</span>`;
+  return `<div class="dist-cell"><div class="dist-bar"><div style="width:${pct}%"></div></div>
+    <span class="num" style="color:${statusColor(dist)}">${fmtPct(dist)}</span></div>`;
+}
+
+function rowHtml(r, point) {
+  const s = r.snapshot;
+  if (!s) {
+    return `<tr><td class="sym">${esc(r.symbol)}</td><td colspan="9" class="muted">${esc(r.error || 'no data')}</td></tr>`;
+  }
+  const q = r.quote || {};
+  const price = q.price ?? s.close;
+  const chg = q.changePct ?? s.changePct;
+  const cur = q.currency || r.meta?.currency;
+  const st = STATUS_META[s.status] || STATUS_META.unknown;
+  const rowCls = [point ? 'row-point' : '', s.status === 'breached' ? 'row-breached' : s.status === 'near' ? 'row-near' : ''].filter(Boolean).join(' ');
+  return `<tr class="${rowCls}" data-symbol="${esc(r.symbol)}">
+    <td class="sym">${esc(r.symbol)}</td>
+    <td class="name">${esc(r.meta?.name || '')}</td>
+    <td class="num">${fmtPrice(price, cur)}</td>
+    <td class="num" style="color:${chg >= 0 ? 'var(--color-ink)' : 'var(--color-accent-2)'}">${fmtPct(chg)}</td>
+    <td><canvas class="spark" data-spark="${esc(r.symbol)}"></canvas></td>
+    <td class="num">${fmtPrice(s.stop, cur)}</td>
+    <td>${distCellHtml(s.dist)}</td>
+    <td><span class="status-chip ${st.cls}">${st.label}</span></td>
+    <td><div class="badges">${badgeHtml(s.badges)}</div></td>
+    <td><div class="row-actions">
+      <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}">chart</button>
+      <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}">alert</button>
+      <button class="icon-btn" data-act="remove" data-symbol="${esc(r.symbol)}">remove</button>
+    </div></td>
+  </tr>`;
+}
+
+function paintSparklines(tbody) {
+  $$(`${tbody} .spark`).forEach((c) => {
+    const row = state.scan.find((r) => r.symbol === c.dataset.spark);
+    if (row?.snapshot?.spark) drawSparkline(c, row.snapshot.spark);
+  });
 }
 
 function renderStats() {
@@ -447,55 +464,23 @@ function renderStats() {
   const recovered = rows.filter((r) => r.snapshot.badges.includes('recovered')).length;
   const t = state.settings?.threshold ?? 5;
   $('#stats-row').innerHTML = `<div class="tally">
-    <div class="tally-item"><span class="k">Near stop (≤${t}%)</span><span class="v num" style="color:var(--color-accent-2)">${near}</span></div>
-    <div class="tally-item"><span class="k">Stop breached</span><span class="v num" style="color:var(--color-dusk)">${breached}</span></div>
-    <div class="tally-item"><span class="k">Safe buffer (&gt;10%)</span><span class="v num" style="color:var(--color-accent-hi)">${safe}</span></div>
-    <div class="tally-item"><span class="k">Recovered</span><span class="v num" style="color:var(--color-accent-2)">${recovered}</span></div>
-    <div class="tally-item"><span class="k">Tracked symbols</span><span class="v num">${rows.length}</span></div>
+    <div class="tally-item"><span class="k">Near stop, within ${t}%</span><span class="v">${near}</span></div>
+    <div class="tally-item"><span class="k">Stop breached</span><span class="v" style="color:var(--color-accent)">${breached}</span></div>
+    <div class="tally-item"><span class="k">Buffer over 10%</span><span class="v">${safe}</span></div>
+    <div class="tally-item"><span class="k">Recovered</span><span class="v">${recovered}</span></div>
+    <div class="tally-item"><span class="k">Tracked symbols</span><span class="v">${rows.length}</span></div>
   </div>`;
 }
 
-function renderCards() {
-  const grid = $('#cards-grid');
+function renderDashboard() {
+  const tbody = $('#dash-tbody');
   const rows = [...state.scan].sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
   if (!rows.length) {
-    grid.innerHTML = '<div class="empty">No data yet — the first scan is loading…</div>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty">Loading the register…</div></td></tr>';
     return;
   }
-  grid.innerHTML = rows
-    .map((r) => {
-      const s = r.snapshot;
-      if (!s) return `<div class="stock-card"><div class="card-top"><span class="card-symbol">${esc(r.symbol)}</span></div><div class="empty">${esc(r.error || 'no data')}</div></div>`;
-      const q = r.quote || {};
-      const price = q.price ?? s.close;
-      const chg = q.changePct ?? s.changePct;
-      const cur = q.currency || r.meta?.currency;
-      const st = STATUS_META[s.status] || STATUS_META.unknown;
-      return `<div class="stock-card status-${s.status}" data-symbol="${esc(r.symbol)}">
-        <div class="card-top">
-          <div><span class="card-symbol">${esc(r.symbol)}</span> <span class="card-name">${esc(r.meta?.name || '')}</span></div>
-          <span class="status-chip ${st.cls}">${st.label}</span>
-        </div>
-        <div class="card-top">
-          <span class="card-price">${fmtPrice(price, cur)}</span>
-          <span class="chg ${chg >= 0 ? 'up' : 'down'}">${fmtPct(chg)}</span>
-        </div>
-        <canvas class="spark" data-spark="${esc(r.symbol)}"></canvas>
-        <div class="stop-row"><span>Stop-loss <b>${fmtPrice(s.stop, cur)}</b></span><span>High <b>${fmtPrice(s.high, cur)}</b></span></div>
-        <div class="stop-row"><span>Distance to stop</span>${distBarHtml(s.dist)}</div>
-        <div class="badges">${badgeHtml(s.badges)}</div>
-        <div class="card-actions">
-          <button class="btn small" data-act="chart" data-symbol="${esc(r.symbol)}">📈 Chart</button>
-          <button class="btn small" data-act="alert" data-symbol="${esc(r.symbol)}">🔔 Alert</button>
-          <button class="btn small danger" data-act="remove" data-symbol="${esc(r.symbol)}">✕</button>
-        </div>
-      </div>`;
-    })
-    .join('');
-  $$('#cards-grid .spark').forEach((c) => {
-    const row = state.scan.find((r) => r.symbol === c.dataset.spark);
-    if (row?.snapshot?.spark) drawSparkline(c, row.snapshot.spark);
-  });
+  tbody.innerHTML = rows.map((r) => rowHtml(r, false)).join('');
+  paintSparklines('#dash-tbody');
 }
 
 function renderScanner() {
@@ -506,36 +491,16 @@ function renderScanner() {
     if (state.filters.size && ![...state.filters].every((f) => r.snapshot.badges.includes(f))) return false;
     return true;
   });
-  const within = state.scan.filter((r) => r.snapshot && r.snapshot.dist != null && r.snapshot.dist <= t).length;
-  $('#scan-summary').textContent = `${within} of ${state.scan.filter((r) => r.snapshot).length} stocks within ${t}% of their stop-loss — sorted closest first.${state.mode === 'static' ? ' (static snapshot)' : ''}`;
+  const withData = state.scan.filter((r) => r.snapshot);
+  const within = withData.filter((r) => r.snapshot.dist != null && r.snapshot.dist <= t).length;
+  const gen = state.scan.generatedAt ? `, data as of ${fmtTime(state.scan.generatedAt)}` : '';
+  $('#scan-summary').textContent = `${within} of ${withData.length} positions within ${t}% of their stop, sorted closest first${gen}.${state.mode === 'static' ? ' Static snapshot.' : ''}`;
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty">No matching stocks.</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty">No matching positions.</div></td></tr>';
     return;
   }
-  tbody.innerHTML = rows
-    .map((r) => {
-      const s = r.snapshot;
-      const q = r.quote || {};
-      const price = q.price ?? s.close;
-      const chg = q.changePct ?? s.changePct;
-      const cur = q.currency || r.meta?.currency;
-      const st = STATUS_META[s.status] || STATUS_META.unknown;
-      const rowCls = s.status === 'breached' ? 'row-breached' : s.status === 'near' ? 'row-near' : '';
-      return `<tr class="${rowCls}" data-symbol="${esc(r.symbol)}">
-        <td class="sym">${esc(r.symbol)}</td>
-        <td class="num">${fmtPrice(price, cur)}</td>
-        <td class="num"><span class="chg ${chg >= 0 ? 'up' : 'down'}">${fmtPct(chg)}</span></td>
-        <td class="num">${fmtPrice(s.stop, cur)}</td>
-        <td style="min-width:130px">${distBarHtml(s.dist)}</td>
-        <td><span class="status-chip ${st.cls}">${st.label}</span></td>
-        <td><div class="badges">${badgeHtml(s.badges)}</div></td>
-        <td><div class="row-actions">
-          <button class="icon-btn" data-act="chart" data-symbol="${esc(r.symbol)}" title="Chart">📈</button>
-          <button class="icon-btn" data-act="alert" data-symbol="${esc(r.symbol)}" title="Set alert">🔔</button>
-        </div></td>
-      </tr>`;
-    })
-    .join('');
+  tbody.innerHTML = rows.map((r, i) => rowHtml(r, i === 0)).join('');
+  paintSparklines('#scan-tbody');
 }
 
 function renderBadgeFilters() {
@@ -547,17 +512,17 @@ function renderBadgeFilters() {
 function renderAlerts() {
   const list = $('#alerts-list');
   if (!state.alerts.length) {
-    list.innerHTML = '<div class="empty">No alerts yet. Click “+ New alert” or the 🔔 button on any stock.</div>';
+    list.innerHTML = '<div class="empty">No alerts yet. Choose “New alert” or the alert action on any row.</div>';
   } else {
     list.innerHTML = state.alerts
       .map((a) => {
         const label = { below: `below ${a.value}`, above: `above ${a.value}`, near_stop: `within ${a.value}% of stop`, stop_breach: 'stop-loss breach' }[a.type];
         return `<div class="alert-item ${a.state === 'triggered' && !a.acknowledged ? 'triggered' : ''}">
           <div class="top">
-            <span class="title">${esc(a.symbol)} — ${esc(label)}</span>
-            <span class="status-chip ${a.state === 'triggered' ? 'status-breached' : 'status-safe'}">${a.state === 'triggered' ? 'TRIGGERED' : 'active'}</span>
+            <span class="title">${esc(a.symbol)}, ${esc(label)}</span>
+            <span class="status-chip ${a.state === 'triggered' ? 'status-breached' : 'status-safe'}">${a.state === 'triggered' ? 'triggered' : 'active'}</span>
           </div>
-          <div class="meta">created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? ` · fired ${esc(fmtTime(a.triggeredAt))}` : ''}${state.mode === 'static' ? ' · stored locally' : ''}</div>
+          <div class="meta">created ${esc(fmtTime(a.createdAt))}${a.triggeredAt ? `, fired ${esc(fmtTime(a.triggeredAt))}` : ''}${state.mode === 'static' ? ', stored in this browser' : ''}</div>
           ${a.note ? `<div class="note">${esc(a.note)}</div>` : ''}
           <div class="actions">
             ${a.state === 'triggered' && !a.acknowledged ? `<button class="btn small" data-ack="${esc(a.id)}">Acknowledge</button>` : ''}
@@ -572,7 +537,7 @@ function renderAlerts() {
     log.innerHTML = '<div class="empty">Nothing triggered yet.</div>';
   } else {
     log.innerHTML = state.log
-      .map((e) => `<div class="log-item">${esc(e.message)}<div class="t">${esc(fmtTime(e.ts))} · price ${esc(e.price)}</div></div>`)
+      .map((e) => `<div class="log-item">${esc(e.message)}<div class="t">${esc(fmtTime(e.ts))}, price ${esc(e.price)}</div></div>`)
       .join('');
   }
   const unacked = state.alerts.filter((a) => a.state === 'triggered' && !a.acknowledged).length;
@@ -590,10 +555,9 @@ function renderSentiment() {
   }
   pill.classList.remove('hidden');
   const score = Math.round(fg.score);
-  const color = score <= 25 ? 'var(--color-dusk)' : score <= 45 ? 'var(--color-accent-2)' : score <= 55 ? 'var(--color-muted)' : score <= 75 ? 'var(--color-accent)' : 'var(--color-accent-hi)';
   const vix = state.sentiment?.vix;
-  pill.innerHTML = `<span class="fg-dot" style="background:${color}"></span> Fear &amp; Greed <b>${score}</b> · ${esc(fg.rating || '')}${vix?.price ? ` · VIX ${vix.price.toFixed(1)}` : ''}`;
-  pill.title = `CNN Fear & Greed: ${score} (${fg.rating})\n1w ago: ${fg.weekAgo?.toFixed?.(0) ?? '—'} · 1m ago: ${fg.monthAgo?.toFixed?.(0) ?? '—'} · 1y ago: ${fg.yearAgo?.toFixed?.(0) ?? '—'}`;
+  pill.innerHTML = `Fear &amp; Greed <b>${score}</b>, ${esc(fg.rating || '—')}${vix?.price ? `, VIX ${vix.price.toFixed(1)}` : ''}`;
+  pill.title = `CNN Fear & Greed ${score} (${fg.rating})\n1 week ago ${fg.weekAgo?.toFixed?.(0) ?? '—'}, 1 month ago ${fg.monthAgo?.toFixed?.(0) ?? '—'}, 1 year ago ${fg.yearAgo?.toFixed?.(0) ?? '—'}`;
 }
 
 function renderSettingsInputs() {
@@ -629,25 +593,26 @@ function renderDetailModal(symbol, h, snapshot) {
   const cur = h.meta?.currency || q?.currency;
   const ranges = ['1mo', '3mo', '6mo', '1y', '2y'];
   modal.innerHTML = `
-    <button class="btn small ghost modal-close" id="modal-close">✕</button>
-    <h3>${esc(symbol)} <span class="muted" style="font-weight:400;font-size:13px">${esc(h.meta?.name || '')} ${esc(h.meta?.exchange || '')}</span></h3>
-    <div class="sub">${fmtPrice(q?.price ?? s?.close, cur)} · ${s ? `<span class="chg ${((q?.changePct ?? s.changePct) >= 0) ? 'up' : 'down'}">${fmtPct(q?.changePct ?? s.changePct)}</span>` : ''} · stop-loss ${s ? fmtPrice(s.stop, cur) : '—'} · distance ${s ? fmtPct(s.dist) : '—'}</div>
+    <button class="btn small ghost modal-close" id="modal-close">Close</button>
+    <h3>${esc(symbol)}</h3>
+    <div class="sub">${esc(h.meta?.name || '')}${h.meta?.exchange ? `, ${esc(h.meta.exchange)}` : ''}</div>
+    <div class="sub">${fmtPrice(q?.price ?? s?.close, cur)} ${s ? `<span style="color:${(q?.changePct ?? s.changePct) >= 0 ? 'var(--color-ink)' : 'var(--color-accent-2)'}">${fmtPct(q?.changePct ?? s.changePct)}</span>` : ''}, stop-loss ${s ? fmtPrice(s.stop, cur) : '—'}, distance ${s ? fmtPct(s.dist) : '—'}</div>
     <div class="range-btns">${ranges.map((r) => `<button class="btn small ${r === state.detailRange ? 'active' : ''}" data-range="${r}">${r.toUpperCase()}</button>`).join('')}</div>
     <canvas class="chart-canvas" id="detail-chart"></canvas>
     <div class="detail-stats">
       ${s ? `
-      <div class="detail-stat"><div class="k">Stop-loss (${state.settings?.stopPct}%)</div><div class="v" style="color:var(--red)">${fmtPrice(s.stop, cur)}</div></div>
-      <div class="detail-stat"><div class="k">ATR stop (${state.settings?.atrMult}×ATR)</div><div class="v" style="color:var(--orange)">${fmtPrice(s.stopAtr, cur)}</div></div>
+      <div class="detail-stat"><div class="k">Stop-loss, ${state.settings?.stopPct}%</div><div class="v">${fmtPrice(s.stop, cur)}</div></div>
+      <div class="detail-stat"><div class="k">ATR stop, ${state.settings?.atrMult}×ATR</div><div class="v">${fmtPrice(s.stopAtr, cur)}</div></div>
       <div class="detail-stat"><div class="k">MA50</div><div class="v">${fmtPrice(s.ma50, cur)}</div></div>
       <div class="detail-stat"><div class="k">MA200</div><div class="v">${fmtPrice(s.ma200, cur)}</div></div>
-      <div class="detail-stat"><div class="k">Volatility (30d)</div><div class="v">${s.volPct == null ? '—' : s.volPct.toFixed(1) + '%'}</div></div>
+      <div class="detail-stat"><div class="k">Volatility, 30d</div><div class="v">${s.volPct == null ? '—' : s.volPct.toFixed(1) + '%'}</div></div>
       <div class="detail-stat"><div class="k">3M trend</div><div class="v">${fmtPct(s.trend3m)}</div></div>
       <div class="detail-stat"><div class="k">From top</div><div class="v">${fmtPct(s.pctFromHigh)}</div></div>
-      <div class="detail-stat"><div class="k">ATR(14)</div><div class="v">${s.atrPct == null ? '—' : s.atrPct.toFixed(2) + '%'}</div></div>` : ''}
+      <div class="detail-stat"><div class="k">ATR 14</div><div class="v">${s.atrPct == null ? '—' : s.atrPct.toFixed(2) + '%'}</div></div>` : ''}
     </div>
     <div class="badges" style="margin-bottom:10px">${s ? badgeHtml(s.badges) : ''}</div>
     <div class="modal-actions">
-      <button class="btn" id="detail-alert">🔔 Set alert</button>
+      <button class="btn primary" id="detail-alert">Set alert</button>
       <button class="btn ghost" id="detail-close">Close</button>
     </div>`;
   $('#modal-close').onclick = closeModal;
@@ -676,9 +641,9 @@ function openAlertModal(symbol = '') {
     .map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
     .join('');
   modal.innerHTML = `
-    <button class="btn small ghost modal-close" id="modal-close">✕</button>
+    <button class="btn small ghost modal-close" id="modal-close">Close</button>
     <h3>New alert</h3>
-    <div class="sub">${state.mode === 'static' ? 'Stored in your browser (localStorage) and evaluated locally on this static snapshot.' : 'Evaluated server-side every 60s. You get an in-app toast and a browser notification when it fires.'}</div>
+    <div class="sub">${state.mode === 'static' ? 'Stored in this browser and checked locally against the latest snapshot.' : 'Checked server-side every 60 seconds; toast and browser notification on trigger.'}</div>
     <div class="form-grid">
       <label>Symbol
         <input id="f-symbol" list="universe-list" value="${esc(symbol)}" placeholder="AAPL" />
@@ -693,7 +658,7 @@ function openAlertModal(symbol = '') {
         </select>
       </label>
       <label class="full" id="f-value-wrap">Value <input id="f-value" type="number" step="any" placeholder="e.g. 150 or 5" /></label>
-      <label class="full">Note (optional) <input id="f-note" placeholder="e.g. re-evaluate position" /></label>
+      <label class="full">Note, optional <input id="f-note" placeholder="e.g. re-evaluate position" /></label>
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="f-cancel">Cancel</button>
@@ -745,11 +710,12 @@ async function loadScan() {
   const data = await api('api/scan');
   state.settings = data.settings;
   state.scan = data.rows;
+  state.scan.generatedAt = data.generatedAt;
   const health = await api('api/health').catch(() => ({}));
   state.demo = !!health.demo;
   $('#demo-badge').classList.toggle('hidden', !state.demo);
   renderStats();
-  renderCards();
+  renderDashboard();
   renderScanner();
   renderSettingsInputs();
 }
@@ -776,8 +742,8 @@ async function evaluateAlerts() {
     for (const f of fired || []) {
       if (state.notified.has(f.entry.id)) continue;
       state.notified.add(f.entry.id);
-      toast(`🚨 ${f.entry.message}`);
-      notifyBrowser('StopLoss Alert', f.entry.message);
+      toast(`Alert: ${f.entry.message}`);
+      notifyBrowser('Stoploss Alert', f.entry.message);
     }
     if (fired?.length) await loadAlerts();
   } catch {
@@ -843,7 +809,7 @@ function init() {
         return loadScan();
       }
     }
-    const row = e.target.closest('#scan-tbody tr[data-symbol]');
+    const row = e.target.closest('#scan-tbody tr[data-symbol], #dash-tbody tr[data-symbol]');
     if (row && !e.target.closest('[data-act]')) openDetail(row.dataset.symbol);
     const ack = e.target.closest('[data-ack]');
     if (ack) {
@@ -880,7 +846,7 @@ async function main() {
       await indexCache();
       await baseSettings();
     } catch (e) {
-      toast(`Static data not found (${e.message}) — run: node server/export.js --out public/data`);
+      toast(`Static data not found (${e.message}), run: node server/export.js --out public/data`);
     }
   }
   init();

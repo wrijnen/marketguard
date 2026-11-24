@@ -22,9 +22,11 @@ to their stop first, and get alerts when levels are approached or breached.**
 - **Technical badges & filters** — 3M uptrend >10% / >20%, within 10% of top,
   above MA50 / MA200, Golden Cross (MA50 > MA200), low volatility <30%,
   safe buffer >10% above stop, and "recovered" (breached recently, back above stop).
-- **Real stock data, no API key** — Yahoo Finance chart API (primary) with a
-  [Stooq](https://stooq.com) fallback, plus the keyless CNN **Fear & Greed Index**
-  and VIX in the header.
+- **Real stock data, no API key** — Yahoo Finance chart API → Nasdaq API →
+  [Stooq](https://stooq.com) fallback chain (the chain matters: GitHub Actions runners are
+  often rate-limited by Yahoo/Stooq, where the Nasdaq API still works), plus the keyless
+  CNN **Fear & Greed Index** and VIX in the header. Default watchlist uses Nasdaq-listed
+  tickers (incl. US ADRs for ASML, Shell, ING, Heineken).
 - **Alerts** — create alerts per symbol: price drops below / rises above a level,
   "within X% of stop-loss", or "stop-loss breached". Evaluated server-side every
   60s and on demand; fires an in-app toast, a browser notification, and a persistent
@@ -109,7 +111,7 @@ The same dashboard runs as a **static site on GitHub Pages**:
 ```
 server/
   index.js       zero-dependency HTTP server + routes (binds 127.0.0.1 by default)
-  data.js        market data layer: Yahoo Finance → Stooq fallback, caching, scan, sentiment
+  data.js        market data layer: Yahoo Finance → Nasdaq API → Stooq fallback, caching, scan, sentiment
   export.js      exports static JSON data (data/*.json) for the GitHub Pages build
   indicators.js  re-exports the shared math module
   alerts.js      persistent alert store + evaluation state machine (server mode)
@@ -132,6 +134,6 @@ Adapted for a dashboard layout; see `public/styles.css`.
 
 ## Data sources & disclaimer
 
-Market data: Yahoo Finance chart API and Stooq (unofficial, free, no key; may be
-delayed). Sentiment: CNN Fear & Greed Index public endpoint. This tool provides
+Market data: Yahoo Finance chart API, Nasdaq API and Stooq (unofficial, free, no key; may be
+delayed). Theme: Dusk from Hallmark (MIT). Sentiment: CNN Fear & Greed Index public endpoint. This tool provides
 alerts for educational purposes only and does not constitute financial advice.
