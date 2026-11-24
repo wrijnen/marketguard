@@ -21,7 +21,7 @@
       "HEINY"
     ]
   },
-  "generatedAt": "2026-11-24T18:19:56.693Z",
+  "generatedAt": "2026-11-24T18:48:08.651Z",
   "rows": [
     {
       "symbol": "AAPL",
@@ -14558,7 +14558,7 @@
     },
     {
       "symbol": "HEINY",
-      "error": "history unavailable for HEINY (HTTP 403)"
+      "error": "history unavailable for HEINY (fetch failed)"
     }
   ]
 }
