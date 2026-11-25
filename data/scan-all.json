@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-25T21:49:10.298Z",
+  "generatedAt": "2026-11-25T22:29:08.096Z",
   "scope": "all",
   "entries": [
     {
@@ -27402,8 +27402,8 @@
         "price": 23585.802,
         "prevClose": null,
         "changePct": -0.62,
-        "time": "2026-11-25T21:50:04.000Z",
-        "asOf": "2026-11-25T21:50:04.000Z",
+        "time": "2026-11-25T22:15:59.000Z",
+        "asOf": "2026-11-25T22:15:59.000Z",
         "currency": "USD",
         "name": "NASDAQ Composite",
         "realTime": true,
@@ -46654,11 +46654,11 @@
       "note": null,
       "quote": {
         "symbol": "BTC-USD",
-        "price": 60234,
+        "price": 60012,
         "prevClose": null,
         "changePct": null,
-        "time": "2026-11-25T21:49:16.000Z",
-        "asOf": "2026-11-25T21:49:16.000Z",
+        "time": "2026-11-25T22:29:34.000Z",
+        "asOf": "2026-11-25T22:29:34.000Z",
         "currency": "USD",
         "name": "BTC-USD (crypto)",
         "realTime": true,
@@ -46679,6 +46679,50 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
+      "symbol": "XRP-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
+      "quote": {
+        "symbol": "7203.T",
+        "price": 3406,
+        "prevClose": null,
+        "changePct": null,
+        "time": "2026-11-25T00:00:00.000Z",
+        "asOf": "2026-11-25T00:00:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADYEY",
@@ -46703,28 +46747,6 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
       "symbol": "ADA-USD",
       "category": "crypto",
       "region": "Global",
@@ -46745,28 +46767,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for RELIANCE.NS (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3406,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-25T00:00:00.000Z",
-        "asOf": "2026-11-25T00:00:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
     }
   ]
 }
