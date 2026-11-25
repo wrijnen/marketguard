@@ -1,92 +1,82 @@
 {
-  "generatedAt": "2026-11-24T23:41:07.221Z",
+  "generatedAt": "2026-11-25T00:52:21.644Z",
   "demo": false,
   "totalSymbols": 49,
-  "okSymbols": 40,
+  "okSymbols": 41,
   "status": "degraded",
   "historyBySource": {
-    "nasdaq": 36,
-    "nasdaq(cached)": 1,
+    "nasdaq": 37,
     "error": 8,
     "nasdaq-proxy": 4
   },
   "quotesBySource": {
     "cnbc": 43,
-    "coingecko": 2,
-    "error": 4
+    "error": 6
   },
   "errors": [
     {
-      "symbol": "SHEL",
-      "error": "history fetch failed, reused cached file: history unavailable for SHEL (fetch failed)"
-    },
-    {
       "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (fetch failed)"
+      "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
       "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (fetch failed)"
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
-      "error": "history unavailable for RELIANCE.NS (fetch failed)"
+      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (fetch failed)"
-    },
-    {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (fetch failed)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (fetch failed)"
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (fetch failed)"
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
+      "symbol": "XRP-USD",
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
-      "error": "history unavailable for ADA-USD (fetch failed)"
+      "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (fetch failed)"
+      "symbol": "BTC-USD",
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "SHEL",
-      "error": "history unavailable for SHEL (fetch failed)"
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (fetch failed)"
-    },
-    {
-      "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (fetch failed)"
-    },
-    {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (fetch failed)"
-    },
-    {
-      "symbol": "RELIANCE.NS",
-      "error": "history unavailable for RELIANCE.NS (fetch failed)"
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (fetch failed)"
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (fetch failed)"
+      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
-      "error": "history unavailable for ADA-USD (fetch failed)"
+      "error": "history unavailable for ADA-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (HTTP 403)"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
     }
   ]
 }
