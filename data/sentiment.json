@@ -2,7 +2,7 @@
   "fearGreed": {
     "score": 15.2253164556962,
     "rating": "extreme fear",
-    "timestamp": "2026-11-25T22:29:31+00:00",
+    "timestamp": "2026-11-25T23:09:40+00:00",
     "previousClose": 17.4212454212454,
     "weekAgo": 29.8857142857143,
     "monthAgo": 16.685714285714287,
@@ -304,7 +304,7 @@
         "rating": "extreme fear"
       },
       {
-        "t": 1795645771000,
+        "t": 1795648180000,
         "score": 15.2253164556962,
         "rating": "extreme fear"
       }
