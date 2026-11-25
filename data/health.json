@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-25T16:56:43.836Z",
+  "generatedAt": "2026-11-25T17:31:49.608Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
@@ -40,16 +40,16 @@
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
-      "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
       "symbol": "ADA-USD",
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (HTTP 403)"
+      "symbol": "XRP-USD",
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADYEY",
@@ -60,8 +60,8 @@
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (HTTP 403)"
+      "symbol": "BTC-USD",
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
@@ -72,8 +72,8 @@
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
