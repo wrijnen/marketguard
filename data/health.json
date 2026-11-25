@@ -1,11 +1,12 @@
 {
-  "generatedAt": "2026-11-25T04:39:46.528Z",
+  "generatedAt": "2026-11-25T05:52:54.486Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
   "status": "degraded",
   "historyBySource": {
-    "nasdaq": 37,
+    "nasdaq": 36,
+    "yahoo": 1,
     "error": 8,
     "nasdaq-proxy": 4
   },
@@ -35,12 +36,12 @@
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
       "symbol": "XRP-USD",
       "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
@@ -51,20 +52,20 @@
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
       "symbol": "XRP-USD",
       "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
