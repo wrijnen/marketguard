@@ -1,8 +1,8 @@
 {
   "fearGreed": {
-    "score": 15.5877034358047,
+    "score": 12.5135623869801,
     "rating": "extreme fear",
-    "timestamp": "2026-11-25T10:39:01+00:00",
+    "timestamp": "2026-11-25T11:39:01+00:00",
     "previousClose": 17.4212454212454,
     "weekAgo": 29.8857142857143,
     "monthAgo": 16.685714285714287,
@@ -295,28 +295,28 @@
       },
       {
         "t": 1795478400000,
-        "score": 15.5877034358047,
+        "score": 12.5135623869801,
         "rating": "extreme fear"
       },
       {
         "t": 1795564800000,
-        "score": 15.5877034358047,
+        "score": 12.5135623869801,
         "rating": "extreme fear"
       },
       {
-        "t": 1795603141000,
-        "score": 15.5877034358047,
+        "t": 1795606741000,
+        "score": 12.5135623869801,
         "rating": "extreme fear"
       }
     ]
   },
   "vix": {
     "symbol": "^VIX",
-    "price": 29.38,
+    "price": 30.27,
     "prevClose": null,
-    "changePct": 11.46,
-    "time": "2026-11-25T10:58:01.000Z",
-    "asOf": "2026-11-25T10:58:01.000Z",
+    "changePct": 14.83,
+    "time": "2026-11-25T11:55:31.000Z",
+    "asOf": "2026-11-25T11:55:31.000Z",
     "currency": "USD",
     "name": "CBOE Volatility Index",
     "realTime": true,
