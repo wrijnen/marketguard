@@ -1,18 +1,20 @@
 {
-  "generatedAt": "2026-11-25T17:31:49.608Z",
+  "generatedAt": "2026-11-25T17:44:27.819Z",
   "demo": false,
   "totalSymbols": 49,
-  "okSymbols": 41,
+  "okSymbols": 42,
   "status": "degraded",
   "historyBySource": {
-    "nasdaq": 37,
+    "nasdaq": 34,
+    "yahoo": 3,
     "error": 7,
     "yahoo(cached)": 1,
     "nasdaq-proxy": 4
   },
   "quotesBySource": {
     "cnbc": 43,
-    "error": 6
+    "yahoo-close": 1,
+    "error": 5
   },
   "errors": [
     {
@@ -32,24 +34,24 @@
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (HTTP 403)"
+      "symbol": "XRP-USD",
+      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
       "symbol": "ADA-USD",
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "symbol": "BTC-USD",
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "ADYEY",
@@ -60,20 +62,16 @@
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (HTTP 403)"
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (HTTP 403)"
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
