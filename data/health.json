@@ -1,12 +1,11 @@
 {
-  "generatedAt": "2026-11-25T19:26:45.534Z",
+  "generatedAt": "2026-11-25T19:47:48.279Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
   "status": "degraded",
   "historyBySource": {
-    "yahoo": 1,
-    "nasdaq": 36,
+    "nasdaq": 37,
     "error": 7,
     "yahoo(cached)": 1,
     "nasdaq-proxy": 4
@@ -49,20 +48,20 @@
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
-    },
-    {
       "symbol": "BTC-USD",
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "ETH-USD",
       "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
