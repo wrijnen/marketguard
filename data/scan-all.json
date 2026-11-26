@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-25T23:41:13.256Z",
+  "generatedAt": "2026-11-26T00:51:57.392Z",
   "scope": "all",
   "entries": [
     {
@@ -46670,26 +46670,15 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3406,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-25T00:00:00.000Z",
-        "asOf": "2026-11-25T00:00:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "ETH-USD",
@@ -46703,26 +46692,37 @@
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
+      "symbol": "XRP-USD",
       "category": "crypto",
       "region": "Global",
       "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
       "quote": {
-        "symbol": "BTC-USD",
-        "price": 60260,
+        "symbol": "7203.T",
+        "price": 3418,
         "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-25T23:40:36.000Z",
-        "asOf": "2026-11-25T23:40:36.000Z",
-        "currency": "USD",
-        "name": "BTC-USD (crypto)",
-        "realTime": true,
-        "source": "coingecko"
+        "changePct": 0.35,
+        "time": "2026-11-26T00:37:54.000Z",
+        "asOf": "2026-11-26T00:37:54.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
       },
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
@@ -46734,17 +46734,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
