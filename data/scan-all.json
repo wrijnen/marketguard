@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-26T16:57:14.683Z",
+  "generatedAt": "2026-11-26T17:35:36.928Z",
   "scope": "all",
   "entries": [
     {
@@ -46730,6 +46730,28 @@
       "error": null
     },
     {
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
       "symbol": "ADYEY",
       "category": "stock",
       "region": "EU",
@@ -46752,26 +46774,26 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
+      "symbol": "SOL-USD",
       "category": "crypto",
       "region": "Global",
       "note": null,
-      "quote": {
-        "symbol": "BTC-USD",
-        "price": 60448,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-26T16:57:02.000Z",
-        "asOf": "2026-11-26T16:57:02.000Z",
-        "currency": "USD",
-        "name": "BTC-USD (crypto)",
-        "realTime": true,
-        "source": "coingecko"
-      },
-      "quoteError": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "category": "stock",
+      "region": "India",
+      "note": "NSE listing, INR (needs Yahoo/Stooq for history)",
+      "quote": null,
+      "quoteError": "history unavailable for RELIANCE.NS (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
     },
     {
       "symbol": "7203.T",
@@ -46796,28 +46818,6 @@
       "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
       "symbol": "ADA-USD",
       "category": "crypto",
       "region": "Global",
@@ -46838,17 +46838,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
-      "symbol": "RELIANCE.NS",
-      "category": "stock",
-      "region": "India",
-      "note": "NSE listing, INR (needs Yahoo/Stooq for history)",
-      "quote": null,
-      "quoteError": "history unavailable for RELIANCE.NS (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
     }
   ]
 }
