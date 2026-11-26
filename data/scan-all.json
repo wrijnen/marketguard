@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-26T05:52:17.376Z",
+  "generatedAt": "2026-11-26T06:59:13.455Z",
   "scope": "all",
   "entries": [
     {
@@ -5953,7 +5953,7 @@
         "symbol": ".VIX",
         "price": 28.29,
         "prevClose": null,
-        "changePct": 7.32,
+        "changePct": null,
         "time": "2026-11-25T00:00:00.000Z",
         "asOf": "2026-11-25T00:00:00.000Z",
         "currency": "USD",
@@ -46730,28 +46730,6 @@
       "error": null
     },
     {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3395,
-        "prevClose": null,
-        "changePct": -0.32,
-        "time": "2026-11-26T05:37:42.000Z",
-        "asOf": "2026-11-26T05:37:42.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (fetch failed)"
-    },
-    {
       "symbol": "ADYEY",
       "category": "stock",
       "region": "EU",
@@ -46772,6 +46750,28 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADYEY (fetch failed)"
+    },
+    {
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
+      "quote": {
+        "symbol": "7203.T",
+        "price": 3377,
+        "prevClose": null,
+        "changePct": -0.85,
+        "time": "2026-11-26T06:30:00.000Z",
+        "asOf": "2026-11-26T06:30:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for 7203.T (fetch failed)"
     },
     {
       "symbol": "BTC-USD",

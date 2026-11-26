@@ -314,7 +314,7 @@
     "symbol": "^VIX",
     "price": 28.29,
     "prevClose": null,
-    "changePct": 7.32,
+    "changePct": null,
     "time": "2026-11-25T00:00:00.000Z",
     "asOf": "2026-11-25T00:00:00.000Z",
     "currency": "USD",
