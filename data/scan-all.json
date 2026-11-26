@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-26T21:43:49.189Z",
+  "generatedAt": "2026-11-26T22:32:06.241Z",
   "scope": "all",
   "entries": [
     {
@@ -46730,28 +46730,6 @@
       "error": null
     },
     {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3377,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-26T00:00:00.000Z",
-        "asOf": "2026-11-26T00:00:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (fetch failed)"
-    },
-    {
       "symbol": "ADYEY",
       "category": "stock",
       "region": "EU",
@@ -46771,7 +46749,7 @@
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for ADYEY (fetch failed)"
+      "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
@@ -46780,11 +46758,11 @@
       "note": null,
       "quote": {
         "symbol": "BTC-USD",
-        "price": 60845,
+        "price": 60534,
         "prevClose": null,
         "changePct": null,
-        "time": "2026-11-26T21:43:42.000Z",
-        "asOf": "2026-11-26T21:43:42.000Z",
+        "time": "2026-11-26T22:31:55.000Z",
+        "asOf": "2026-11-26T22:31:55.000Z",
         "currency": "USD",
         "name": "BTC-USD (crypto)",
         "realTime": true,
@@ -46793,29 +46771,7 @@
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for BTC-USD (fetch failed)"
-    },
-    {
-      "symbol": "RELIANCE.NS",
-      "category": "stock",
-      "region": "India",
-      "note": "NSE listing, INR (needs Yahoo/Stooq for history)",
-      "quote": null,
-      "quoteError": "history unavailable for RELIANCE.NS (fetch failed)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for RELIANCE.NS (fetch failed)"
-    },
-    {
-      "symbol": "ETH-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for ETH-USD (fetch failed)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ETH-USD (fetch failed)"
+      "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
@@ -46823,10 +46779,21 @@
       "region": "Global",
       "note": null,
       "quote": null,
-      "quoteError": "history unavailable for SOL-USD (fetch failed)",
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for SOL-USD (fetch failed)"
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
@@ -46834,10 +46801,32 @@
       "region": "Global",
       "note": null,
       "quote": null,
-      "quoteError": "history unavailable for XRP-USD (fetch failed)",
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for XRP-USD (fetch failed)"
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
+      "quote": {
+        "symbol": "7203.T",
+        "price": 3377,
+        "prevClose": null,
+        "changePct": null,
+        "time": "2026-11-26T00:00:00.000Z",
+        "asOf": "2026-11-26T00:00:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
@@ -46845,10 +46834,21 @@
       "region": "Global",
       "note": null,
       "quote": null,
-      "quoteError": "history unavailable for ADA-USD (fetch failed)",
+      "quoteError": "history unavailable for ADA-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for ADA-USD (fetch failed)"
+      "error": "history unavailable for ADA-USD (HTTP 403)"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "category": "stock",
+      "region": "India",
+      "note": "NSE listing, INR (needs Yahoo/Stooq for history)",
+      "quote": null,
+      "quoteError": "history unavailable for RELIANCE.NS (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
     }
   ]
 }
