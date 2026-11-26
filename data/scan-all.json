@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-26T23:32:17.671Z",
+  "generatedAt": "2026-11-26T23:45:21.949Z",
   "scope": "all",
   "entries": [
     {
@@ -46730,45 +46730,12 @@
       "error": null
     },
     {
-      "symbol": "ADYEY",
-      "category": "stock",
-      "region": "EU",
-      "note": "US ADR (Adyen), USD",
-      "quote": {
-        "symbol": "ADYEY",
-        "price": 9.29,
-        "prevClose": null,
-        "changePct": 0.98,
-        "time": "2026-11-25T00:00:00.000Z",
-        "asOf": "2026-11-25T00:00:00.000Z",
-        "currency": "USD",
-        "name": "Adyen N.V.",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ADYEY (HTTP 403)"
-    },
-    {
       "symbol": "BTC-USD",
       "category": "crypto",
       "region": "Global",
       "note": null,
-      "quote": {
-        "symbol": "BTC-USD",
-        "price": 60440,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-26T23:32:19.000Z",
-        "asOf": "2026-11-26T23:32:19.000Z",
-        "currency": "USD",
-        "name": "BTC-USD (crypto)",
-        "realTime": true,
-        "source": "coingecko"
-      },
-      "quoteError": null,
+      "quote": null,
+      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for BTC-USD (HTTP 403)"
@@ -46796,28 +46763,6 @@
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
-      "symbol": "ADA-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for ADA-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
       "symbol": "7203.T",
       "category": "stock",
       "region": "Asia",
@@ -46838,6 +46783,50 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for 7203.T (HTTP 403)"
+    },
+    {
+      "symbol": "XRP-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "category": "stock",
+      "region": "EU",
+      "note": "US ADR (Adyen), USD",
+      "quote": {
+        "symbol": "ADYEY",
+        "price": 9.29,
+        "prevClose": null,
+        "changePct": 0.98,
+        "time": "2026-11-25T00:00:00.000Z",
+        "asOf": "2026-11-25T00:00:00.000Z",
+        "currency": "USD",
+        "name": "Adyen N.V.",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ADYEY (HTTP 403)"
+    },
+    {
+      "symbol": "ADA-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ADA-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
