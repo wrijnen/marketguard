@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-26T19:55:28.565Z",
+  "generatedAt": "2026-11-26T20:35:39.393Z",
   "scope": "all",
   "entries": [
     {
@@ -43241,7 +43241,7 @@
           "safeBuffer"
         ],
         "meta": {
-          "name": "INDA",
+          "name": "ishares MSCI India ETF",
           "currency": "USD",
           "exchange": "Nasdaq",
           "nasdaqSymbol": "INDA",
@@ -43311,7 +43311,7 @@
         ]
       },
       "meta": {
-        "name": "INDA",
+        "name": "ishares MSCI India ETF",
         "currency": "USD",
         "exchange": "Nasdaq",
         "nasdaqSymbol": "INDA",
@@ -46752,6 +46752,39 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
       "symbol": "7203.T",
       "category": "stock",
       "region": "Asia",
@@ -46774,37 +46807,15 @@
       "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
+      "symbol": "XRP-USD",
       "category": "crypto",
       "region": "Global",
       "note": null,
       "quote": null,
-      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
-      "symbol": "BTC-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
+      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
@@ -46816,17 +46827,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
