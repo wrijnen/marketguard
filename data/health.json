@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-27T20:31:42.760Z",
+  "generatedAt": "2026-11-27T20:46:15.633Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
@@ -12,7 +12,8 @@
   },
   "quotesBySource": {
     "cnbc": 43,
-    "error": 6
+    "error": 5,
+    "coingecko": 1
   },
   "errors": [
     {
@@ -32,36 +33,36 @@
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
-      "symbol": "ADA-USD",
-      "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
       "symbol": "ETH-USD",
       "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
       "error": "history fetch failed, reused cached file: history unavailable for XRP-USD (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "symbol": "ADA-USD",
+      "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (HTTP 403)"
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ETH-USD",
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (HTTP 403)"
+      "symbol": "BTC-USD",
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
@@ -72,8 +73,8 @@
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (HTTP 403)"
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
