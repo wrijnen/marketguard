@@ -1,19 +1,18 @@
 {
-  "generatedAt": "2026-11-27T07:00:07.535Z",
+  "generatedAt": "2026-11-27T08:43:10.792Z",
   "demo": false,
   "totalSymbols": 49,
-  "okSymbols": 42,
+  "okSymbols": 41,
   "status": "degraded",
   "historyBySource": {
     "nasdaq": 37,
     "error": 6,
-    "yahoo(cached)": 1,
-    "yahoo": 1,
+    "yahoo(cached)": 2,
     "nasdaq-proxy": 4
   },
   "quotesBySource": {
     "cnbc": 43,
-    "yahoo-close": 1,
+    "coingecko": 1,
     "error": 5
   },
   "errors": [
@@ -34,26 +33,26 @@
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "ETH-USD",
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
       "symbol": "SOL-USD",
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
+      "symbol": "ETH-USD",
+      "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
       "symbol": "XRP-USD",
       "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADA-USD",
+      "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
       "error": "history unavailable for BTC-USD (HTTP 403)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (HTTP 403)"
-    },
-    {
       "symbol": "ETH-USD",
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
@@ -64,6 +63,14 @@
     {
       "symbol": "XRP-USD",
       "error": "history unavailable for XRP-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (HTTP 403)"
+    },
+    {
+      "symbol": "ADA-USD",
+      "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
       "symbol": "7203.T",
