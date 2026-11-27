@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-27T21:45:37.234Z",
+  "generatedAt": "2026-11-27T22:33:43.281Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
@@ -12,8 +12,8 @@
   },
   "quotesBySource": {
     "cnbc": 43,
-    "coingecko": 1,
-    "error": 5
+    "coingecko": 3,
+    "error": 3
   },
   "errors": [
     {
@@ -21,12 +21,12 @@
       "error": "history unavailable for ADYEY (fetch failed)"
     },
     {
-      "symbol": "RELIANCE.NS",
-      "error": "history fetch failed, reused cached file: history unavailable for RELIANCE.NS (fetch failed)"
-    },
-    {
       "symbol": "7203.T",
       "error": "history unavailable for 7203.T (fetch failed)"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "error": "history fetch failed, reused cached file: history unavailable for RELIANCE.NS (fetch failed)"
     },
     {
       "symbol": "BTC-USD",
@@ -49,28 +49,28 @@
       "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (fetch failed)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (fetch failed)"
-    },
-    {
       "symbol": "7203.T",
       "error": "history unavailable for 7203.T (fetch failed)"
+    },
+    {
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (fetch failed)"
     },
     {
       "symbol": "BTC-USD",
       "error": "history unavailable for BTC-USD (fetch failed)"
     },
     {
-      "symbol": "RELIANCE.NS",
-      "error": "history unavailable for RELIANCE.NS (fetch failed)"
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (fetch failed)"
     },
     {
       "symbol": "ETH-USD",
       "error": "history unavailable for ETH-USD (fetch failed)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (fetch failed)"
+      "symbol": "RELIANCE.NS",
+      "error": "history unavailable for RELIANCE.NS (fetch failed)"
     },
     {
       "symbol": "XRP-USD",
