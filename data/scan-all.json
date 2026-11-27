@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-27T19:49:59.245Z",
+  "generatedAt": "2026-11-27T20:31:42.760Z",
   "scope": "all",
   "entries": [
     {
@@ -46730,26 +46730,26 @@
       "error": null
     },
     {
-      "symbol": "ADYEY",
+      "symbol": "7203.T",
       "category": "stock",
-      "region": "EU",
-      "note": "US ADR (Adyen), USD",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
       "quote": {
-        "symbol": "ADYEY",
-        "price": 9.62,
+        "symbol": "7203.T",
+        "price": 3384,
         "prevClose": null,
-        "changePct": 3.55,
-        "time": "2026-11-27T17:59:59.000Z",
-        "asOf": "2026-11-27T17:59:59.000Z",
-        "currency": "USD",
-        "name": "Adyen N.V.",
+        "changePct": 0.21,
+        "time": "2026-11-27T06:30:00.000Z",
+        "asOf": "2026-11-27T06:30:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
         "realTime": false,
         "source": "cnbc"
       },
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for ADYEY (HTTP 403)"
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
@@ -46796,28 +46796,6 @@
       "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3384,
-        "prevClose": null,
-        "changePct": 0.21,
-        "time": "2026-11-27T06:30:00.000Z",
-        "asOf": "2026-11-27T06:30:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
-    },
-    {
       "symbol": "ADA-USD",
       "category": "crypto",
       "region": "Global",
@@ -46827,6 +46805,28 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADA-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ADYEY",
+      "category": "stock",
+      "region": "EU",
+      "note": "US ADR (Adyen), USD",
+      "quote": {
+        "symbol": "ADYEY",
+        "price": 9.62,
+        "prevClose": null,
+        "changePct": 3.55,
+        "time": "2026-11-27T17:59:59.000Z",
+        "asOf": "2026-11-27T17:59:59.000Z",
+        "currency": "USD",
+        "name": "Adyen N.V.",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
