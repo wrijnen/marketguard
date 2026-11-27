@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-27T21:32:09.855Z",
+  "generatedAt": "2026-11-27T21:45:37.234Z",
   "scope": "all",
   "entries": [
     {
@@ -46749,7 +46749,7 @@
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for ADYEY (HTTP 403)"
+      "error": "history unavailable for ADYEY (fetch failed)"
     },
     {
       "symbol": "7203.T",
@@ -46771,7 +46771,7 @@
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "error": "history unavailable for 7203.T (fetch failed)"
     },
     {
       "symbol": "BTC-USD",
@@ -46780,11 +46780,11 @@
       "note": null,
       "quote": {
         "symbol": "BTC-USD",
-        "price": 59765,
+        "price": 59774,
         "prevClose": null,
         "changePct": null,
-        "time": "2026-11-27T21:31:51.000Z",
-        "asOf": "2026-11-27T21:31:51.000Z",
+        "time": "2026-11-27T21:45:53.000Z",
+        "asOf": "2026-11-27T21:45:53.000Z",
         "currency": "USD",
         "name": "BTC-USD (crypto)",
         "realTime": true,
@@ -46793,62 +46793,7 @@
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
-      "symbol": "ETH-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": {
-        "symbol": "ETH-USD",
-        "price": 1664.26,
-        "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-27T21:31:51.000Z",
-        "asOf": "2026-11-27T21:31:51.000Z",
-        "currency": "USD",
-        "name": "ETH-USD (crypto)",
-        "realTime": true,
-        "source": "coingecko"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
-      "symbol": "ADA-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for ADA-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ADA-USD (HTTP 403)"
+      "error": "history unavailable for BTC-USD (fetch failed)"
     },
     {
       "symbol": "RELIANCE.NS",
@@ -46856,10 +46801,54 @@
       "region": "India",
       "note": "NSE listing, INR (needs Yahoo/Stooq for history)",
       "quote": null,
-      "quoteError": "history unavailable for RELIANCE.NS (HTTP 403)",
+      "quoteError": "history unavailable for RELIANCE.NS (fetch failed)",
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for RELIANCE.NS (HTTP 403)"
+      "error": "history unavailable for RELIANCE.NS (fetch failed)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ETH-USD (fetch failed)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ETH-USD (fetch failed)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (fetch failed)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for SOL-USD (fetch failed)"
+    },
+    {
+      "symbol": "XRP-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for XRP-USD (fetch failed)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for XRP-USD (fetch failed)"
+    },
+    {
+      "symbol": "ADA-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ADA-USD (fetch failed)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ADA-USD (fetch failed)"
     }
   ]
 }
