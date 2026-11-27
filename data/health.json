@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-11-27T14:19:30.938Z",
+  "generatedAt": "2026-11-27T15:23:27.943Z",
   "demo": false,
   "totalSymbols": 49,
-  "okSymbols": 41,
+  "okSymbols": 42,
   "status": "degraded",
   "historyBySource": {
-    "nasdaq": 34,
-    "yahoo": 3,
+    "nasdaq": 37,
     "error": 5,
     "yahoo(cached)": 3,
     "nasdaq-proxy": 4
   },
   "quotesBySource": {
     "cnbc": 43,
-    "error": 6
+    "yahoo-close": 1,
+    "error": 5
   },
   "errors": [
     {
@@ -21,12 +21,12 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "RELIANCE.NS",
-      "error": "history fetch failed, reused cached file: history unavailable for RELIANCE.NS (HTTP 403)"
-    },
-    {
       "symbol": "7203.T",
       "error": "history unavailable for 7203.T (HTTP 403)"
+    },
+    {
+      "symbol": "RELIANCE.NS",
+      "error": "history fetch failed, reused cached file: history unavailable for RELIANCE.NS (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
@@ -49,8 +49,12 @@
       "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "error": "history unavailable for BTC-USD (HTTP 403)"
+      "symbol": "ADYEY",
+      "error": "history unavailable for ADYEY (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ETH-USD",
@@ -61,20 +65,12 @@
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
-      "symbol": "ADYEY",
-      "error": "history unavailable for ADYEY (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "error": "history unavailable for XRP-USD (HTTP 403)"
-    },
-    {
       "symbol": "ADA-USD",
       "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
+      "symbol": "XRP-USD",
+      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
