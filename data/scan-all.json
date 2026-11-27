@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-27T18:27:26.414Z",
+  "generatedAt": "2026-11-27T18:45:18.498Z",
   "scope": "all",
   "entries": [
     {
@@ -26317,8 +26317,8 @@
         "price": 24129.5,
         "prevClose": null,
         "changePct": 2.31,
-        "time": "2026-11-27T18:28:25.000Z",
-        "asOf": "2026-11-27T18:28:25.000Z",
+        "time": "2026-11-27T18:46:11.000Z",
+        "asOf": "2026-11-27T18:46:11.000Z",
         "currency": "USD",
         "name": "NASDAQ Composite",
         "realTime": true,
@@ -36513,8 +36513,8 @@
         "price": 7297.49,
         "prevClose": null,
         "changePct": 1.6,
-        "time": "2026-11-27T18:20:00.000Z",
-        "asOf": "2026-11-27T18:20:00.000Z",
+        "time": "2026-11-27T18:38:39.000Z",
+        "asOf": "2026-11-27T18:38:39.000Z",
         "currency": "USD",
         "name": "S&P 500 Index",
         "realTime": true,
@@ -38783,8 +38783,8 @@
         "price": 50774.94,
         "prevClose": null,
         "changePct": 1.18,
-        "time": "2026-11-27T18:20:01.000Z",
-        "asOf": "2026-11-27T18:20:01.000Z",
+        "time": "2026-11-27T18:38:45.000Z",
+        "asOf": "2026-11-27T18:38:45.000Z",
         "currency": "USD",
         "name": "Dow Jones Industrial Average",
         "realTime": true,
@@ -46752,6 +46752,28 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": {
+        "symbol": "BTC-USD",
+        "price": 59758,
+        "prevClose": null,
+        "changePct": null,
+        "time": "2026-11-27T18:44:56.000Z",
+        "asOf": "2026-11-27T18:44:56.000Z",
+        "currency": "USD",
+        "name": "BTC-USD (crypto)",
+        "realTime": true,
+        "source": "coingecko"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
       "symbol": "7203.T",
       "category": "stock",
       "region": "Asia",
@@ -46774,28 +46796,6 @@
       "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "ETH-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
       "symbol": "XRP-USD",
       "category": "crypto",
       "region": "Global",
@@ -46816,6 +46816,17 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
+      "symbol": "ETH-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for ETH-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
