@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-28T03:21:41.340Z",
+  "generatedAt": "2026-11-28T04:28:14.230Z",
   "scope": "all",
   "entries": [
     {
@@ -46648,6 +46648,28 @@
       "error": null
     },
     {
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": {
+        "symbol": "BTC-USD",
+        "price": 59984,
+        "prevClose": null,
+        "changePct": null,
+        "time": "2026-11-28T04:28:16.000Z",
+        "asOf": "2026-11-28T04:28:16.000Z",
+        "currency": "USD",
+        "name": "BTC-USD (crypto)",
+        "realTime": true,
+        "source": "coingecko"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
       "symbol": "ADYEY",
       "category": "stock",
       "region": "EU",
@@ -46670,28 +46692,6 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
       "symbol": "ETH-USD",
       "category": "crypto",
       "region": "Global",
@@ -46701,17 +46701,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ETH-USD (HTTP 403)"
-    },
-    {
-      "symbol": "XRP-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "7203.T",
@@ -46736,6 +46725,17 @@
       "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
+      "symbol": "SOL-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for SOL-USD (HTTP 403)"
+    },
+    {
       "symbol": "ADA-USD",
       "category": "crypto",
       "region": "Global",
@@ -46745,6 +46745,17 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADA-USD (HTTP 403)"
+    },
+    {
+      "symbol": "XRP-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for XRP-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
