@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-28T11:40:24.148Z",
+  "generatedAt": "2026-11-28T12:47:15.759Z",
   "scope": "all",
   "entries": [
     {
@@ -46652,8 +46652,19 @@
       "category": "crypto",
       "region": "Global",
       "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
+      "quote": {
+        "symbol": "BTC-USD",
+        "price": 59180,
+        "prevClose": null,
+        "changePct": null,
+        "time": "2026-11-28T12:46:35.000Z",
+        "asOf": "2026-11-28T12:46:35.000Z",
+        "currency": "USD",
+        "name": "BTC-USD (crypto)",
+        "realTime": true,
+        "source": "coingecko"
+      },
+      "quoteError": null,
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for BTC-USD (HTTP 403)"
@@ -46668,6 +46679,28 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
+      "quote": {
+        "symbol": "7203.T",
+        "price": 3384,
+        "prevClose": null,
+        "changePct": 0.21,
+        "time": "2026-11-27T00:00:00.000Z",
+        "asOf": "2026-11-27T00:00:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
+      },
+      "quoteError": null,
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "SOL-USD",
@@ -46701,28 +46734,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3384,
-        "prevClose": null,
-        "changePct": 0.21,
-        "time": "2026-11-27T00:00:00.000Z",
-        "asOf": "2026-11-27T00:00:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADYEY",

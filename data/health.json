@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-28T11:40:24.148Z",
+  "generatedAt": "2026-11-28T12:47:15.759Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
@@ -12,7 +12,8 @@
   },
   "quotesBySource": {
     "cnbc": 43,
-    "error": 6
+    "coingecko": 1,
+    "error": 5
   },
   "errors": [
     {
@@ -56,6 +57,10 @@
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
+      "symbol": "7203.T",
+      "error": "history unavailable for 7203.T (HTTP 403)"
+    },
+    {
       "symbol": "SOL-USD",
       "error": "history unavailable for SOL-USD (HTTP 403)"
     },
@@ -66,10 +71,6 @@
     {
       "symbol": "ADA-USD",
       "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ADYEY",
