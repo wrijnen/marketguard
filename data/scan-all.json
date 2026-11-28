@@ -22,7 +22,7 @@
     ],
     "stops": {}
   },
-  "generatedAt": "2026-11-28T00:52:19.500Z",
+  "generatedAt": "2026-11-28T02:10:55.052Z",
   "scope": "all",
   "entries": [
     {
@@ -46648,6 +46648,17 @@
       "error": null
     },
     {
+      "symbol": "BTC-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for BTC-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for BTC-USD (HTTP 403)"
+    },
+    {
       "symbol": "ADYEY",
       "category": "stock",
       "region": "EU",
@@ -46670,37 +46681,26 @@
       "error": "history unavailable for ADYEY (HTTP 403)"
     },
     {
-      "symbol": "BTC-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
+      "symbol": "7203.T",
+      "category": "stock",
+      "region": "Asia",
+      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
       "quote": {
-        "symbol": "BTC-USD",
-        "price": 59877,
+        "symbol": "7203.T",
+        "price": 3384,
         "prevClose": null,
-        "changePct": null,
-        "time": "2026-11-28T00:52:50.000Z",
-        "asOf": "2026-11-28T00:52:50.000Z",
-        "currency": "USD",
-        "name": "BTC-USD (crypto)",
-        "realTime": true,
-        "source": "coingecko"
+        "changePct": 0.21,
+        "time": "2026-11-27T06:30:00.000Z",
+        "asOf": "2026-11-27T06:30:00.000Z",
+        "currency": "JPY",
+        "name": "TOYOTA MOTOR CORPORATION",
+        "realTime": false,
+        "source": "cnbc"
       },
       "quoteError": null,
       "snapshot": null,
       "meta": null,
-      "error": "history unavailable for BTC-USD (HTTP 403)"
-    },
-    {
-      "symbol": "SOL-USD",
-      "category": "crypto",
-      "region": "Global",
-      "note": null,
-      "quote": null,
-      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for SOL-USD (HTTP 403)"
+      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "ETH-USD",
@@ -46712,6 +46712,17 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ETH-USD (HTTP 403)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "category": "crypto",
+      "region": "Global",
+      "note": null,
+      "quote": null,
+      "quoteError": "history unavailable for SOL-USD (HTTP 403)",
+      "snapshot": null,
+      "meta": null,
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "XRP-USD",
@@ -46734,28 +46745,6 @@
       "snapshot": null,
       "meta": null,
       "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
-      "symbol": "7203.T",
-      "category": "stock",
-      "region": "Asia",
-      "note": "Tokyo Exchange, JPY (needs Yahoo/Stooq for history)",
-      "quote": {
-        "symbol": "7203.T",
-        "price": 3384,
-        "prevClose": null,
-        "changePct": 0.21,
-        "time": "2026-11-27T06:30:00.000Z",
-        "asOf": "2026-11-27T06:30:00.000Z",
-        "currency": "JPY",
-        "name": "TOYOTA MOTOR CORPORATION",
-        "realTime": false,
-        "source": "cnbc"
-      },
-      "quoteError": null,
-      "snapshot": null,
-      "meta": null,
-      "error": "history unavailable for 7203.T (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
