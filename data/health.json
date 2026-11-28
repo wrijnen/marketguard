@@ -1,12 +1,11 @@
 {
-  "generatedAt": "2026-11-28T13:55:47.340Z",
+  "generatedAt": "2026-11-28T14:39:49.319Z",
   "demo": false,
   "totalSymbols": 49,
   "okSymbols": 41,
   "status": "degraded",
   "historyBySource": {
-    "nasdaq": 36,
-    "yahoo": 1,
+    "nasdaq": 37,
     "error": 5,
     "yahoo(cached)": 3,
     "nasdaq-proxy": 4
@@ -37,16 +36,16 @@
       "error": "history unavailable for ETH-USD (HTTP 403)"
     },
     {
-      "symbol": "SOL-USD",
-      "error": "history unavailable for SOL-USD (HTTP 403)"
-    },
-    {
       "symbol": "XRP-USD",
       "error": "history fetch failed, reused cached file: history unavailable for XRP-USD (HTTP 403)"
     },
     {
       "symbol": "ADA-USD",
       "error": "history fetch failed, reused cached file: history unavailable for ADA-USD (HTTP 403)"
+    },
+    {
+      "symbol": "SOL-USD",
+      "error": "history unavailable for SOL-USD (HTTP 403)"
     },
     {
       "symbol": "BTC-USD",
@@ -69,12 +68,12 @@
       "error": "history unavailable for XRP-USD (HTTP 403)"
     },
     {
-      "symbol": "ADA-USD",
-      "error": "history unavailable for ADA-USD (HTTP 403)"
-    },
-    {
       "symbol": "7203.T",
       "error": "history unavailable for 7203.T (HTTP 403)"
+    },
+    {
+      "symbol": "ADA-USD",
+      "error": "history unavailable for ADA-USD (HTTP 403)"
     },
     {
       "symbol": "RELIANCE.NS",
